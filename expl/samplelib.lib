@@ -1,0 +1,34 @@
+        BRKP
+        PUSH BP
+        MOV BP, SP
+        MOV R0, 6
+        MOV R1, BP
+        SUB R1, R0
+        MOV R1, [R1]
+        MOV R0, 3
+        MOV R3, BP
+        SUB R3, R0
+        MOV R3, [R3]
+        MOV R2,"Write"
+        EQ R2, R1
+        JZ R2,56
+        MOV R0, 5
+        MOV R2, -2
+        PUSH R0
+        PUSH R2
+        PUSH R3
+        PUSH R0
+        PUSH R0              //pushing sapce for return value
+        INT 7
+        BRKP
+        POP R0            //pop return value
+        POP R1           // pop out arguments and system call number
+        POP R1
+        POP R1
+        POP R1
+        MOV BP,[SP]                
+        POP R1 //now SP=ret
+        MOV R1 ,SP
+        SUB R1, 1
+        MOV [R1],R0
+        RET
