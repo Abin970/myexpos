@@ -1,25 +1,39 @@
 int main()
 {
 decl
-    int temp,n,m,f;
+    int temp,n,m,f,sum;
 enddecl
 begin
-    n=1;
-    while ( n <= 100 ) do
-	m = n/2;
-	f=1;
-	while (m >= 2) do
-		if( (n%m) == 0) then
-			f = 0;
-			break;
-		endif;
-		m = m-1;
+    //n=1;
+    //while ( n <= 100 ) do
+//	m = n/2;
+///	f=1;
+//	while (m >= 2) do
+//		if( (n%m) == 0) then
+//			f = 0;
+//			break;
+//		endif;
+//		m = m-1;
+//	endwhile;
+//      if(f == 1) then
+//                temp = exposcall ( "Write" , -2, n );
+//        endif;
+//         n = n + 1;
+ //   endwhile;
+	n=1;
+	sum=0;
+	while(n<=50)do
+	sum = sum + n;
+	n = n +1;
 	endwhile;
-        if(f == 1) then
-                temp = exposcall ( "Write" , -2, n );
-        endif;
-         n = n + 1;
-    endwhile;
+	temp = exposcall("Write", -2, sum);
+	n = 1;
+	sum=0;
+	while(n<=51) do
+	sum = sum + n;
+	n = n +1;
+	endwhile;
+	temp = exposcall("Write", -2, sum);
     return 0;
 end
 }
