@@ -1,0 +1,38 @@
+0
+2056
+0
+0
+0
+0
+0
+0
+MOV R0, 1//4*512+8=2056
+MOV R2, 5//
+GE R2, R0
+JZ R2, 2110
+MOV R1,R0
+MUL R1, R0//BRKP
+PUSH R0
+PUSH R1
+PUSH R2 //pushing sys call nums and arguments
+MOV R0, 5
+MOV R2, -2
+PUSH R0
+PUSH R2
+PUSH R1 
+PUSH R0 // dummy argument
+PUSH R0 // pushing space for return value
+INT 7 
+POP R1//pop return value and ignore
+POP R1 // pop out arguments and system call number and ignore
+POP R1
+POP R1
+POP R1 //resotre the register
+POP R2
+POP R1
+POP R0
+
+ADD R0, 1
+JMP 2058
+INT 10
+

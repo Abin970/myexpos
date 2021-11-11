@@ -1,0 +1,56 @@
+//[[PROCESS_TABLE + childPID*16 + 14] + 0]=[ [PROCESS_TABLE + [PROCESS_TABLE +childPID*16+2]*16 + 14] + 0];
+        //[[PROCESS_TABLE + childPID*16 + 14]+1]=[ [PROCESS_TABLE + [PROCESS_TABLE +childPID*16+2]*16 + 14] + 1];
+        //increment share count
+        //[MEMORY_FREE_LIST + [ [PROCESS_TABLE + [PROCESS_TABLE + childPID*16 + 2]*16 + 14]+0]]=[MEMORY_FREE_LIST + [ [PROCESS_TABLE + [PROCESS_TABLE +childPID*16 + 2]*16 + 14] + 0]] + 1;
+
+        //[ [PROCESS_TABLE + childPID*16 + 14]+2]=[ [PROCESS_TABLE + [PROCESS_TABLE +childPID*16+2]*16 + 14]+2];
+        //[[PROCESS_TABLE + childPID*16 + 14]+3]=[ [PROCESS_TABLE + [PROCESS_TABLE +childPID*16+2]*16 + 14]+3];
+        //increment share count
+        //[MEMORY_FREE_LIST + [ [PROCESS_TABLE + [PROCESS_TABLE +childPID*16+2]*16 + 14]+2] ]=[MEMORY_FREE_LIST + [[PROCESS_TABLE + [PROCESS_TABLE +childPID*16+2]*16 + 14] + 2]] + 1;
+
+        //heap pages
+        //[ [PROCESS_TABLE + childPID*16 + 14]+4]=[ [PROCESS_TABLE + [PROCESS_TABLE +childPID*16+2]*16 + 14]+4];
+        //[ [PROCESS_TABLE + childPID*16 + 14] + 5]=[ [PROCESS_TABLE + [PROCESS_TABLE +childPID*16+2]*16 + 14]+5];
+        //increment share count always alloc before fork
+        //[MEMORY_FREE_LIST + [ [PROCESS_TABLE + [PROCESS_TABLE +childPID*16+2]*16 + 14]+4] ]=[MEMORY_FREE_LIST + [ [PROCESS_TABLE + [PROCESS_TABLE +childPID*16+2]*16 + 14] + 4] ] + 1;
+
+        //heap2
+        //[[PROCESS_TABLE + childPID*16 + 14]+6]=[ [PROCESS_TABLE+ [PROCESS_TABLE +childPID*16+2]*16 + 14] + 6];
+        //[[PROCESS_TABLE + childPID*16 + 14] + 7]=[ [PROCESS_TABLE+ [PROCESS_TABLE +childPID*16+2]*16 + 14] + 7];
+        //increment share count always alloc before fork
+        //[MEMORY_FREE_LIST + [ [PROCESS_TABLE + [PROCESS_TABLE +childPID*16+2]*16 + 14] + 6]]= [MEMORY_FREE_LIST + [[PROCESS_TABLE + [PROCESS_TABLE +childPID*16+2]*16 + 14]+6] ] + 1;
+
+        //code1
+        //[[PROCESS_TABLE + childPID*16 + 14]+8]=[PROCESS_TABLE + [PROCESS_TABLE +childPID*16+2]*16 + 14]+8];
+        //[[PROCESS_TABLE + childPID*16 + 14]+9]=[PROCESS_TABLE + [PROCESS_TABLE +childPID*16+2]*16 + 14]+9];
+        //increment share count if code page alloc
+        //if([ [PROCESS_TABLE + [PROCESS_TABLE +childPID*16+2]*16 + 14]+8] != -1) then
+        //[MEMORY_FREE_LIST + [[PROCESS_TABLE + [PROCESS_TABLE +childPID*16+2]*16 + 14]+8] ]=[[MEMORY_FREE_LIST + [[PROCESS_TABLE + [PROCESS_TABLE +childPID*16+2]*16 + 14]+8] ] + 1;
+
+        //endif;
+//code2
+        //[[PROCESS_TABLE + childPID*16 + 14] + 10]=[PROCESS_TABLE + [PROCESS_TABLE +childPID*16+2]*16 + 14] + 10];
+        //[[PROCESS_TABLE + childPID*16 + 14] + 11]=[PROCESS_TABLE + [PROCESS_TABLE +childPID*16+2]*16 + 14] + 11];
+        //increment share count if code page alloc
+        //if([ [PROCESS_TABLE + [PROCESS_TABLE +childPID*16+2]*16 + 14]+10] != -1) then
+        //[MEMORY_FREE_LIST + [[PROCESS_TABLE + [PROCESS_TABLE +childPID*16+2]*16 + 14] + 10] ]=[[MEMORY_FREE_LIST + [[PROCESS_TABLE + [PROCESS_TABLE +childPID*16+2]*16 + 14] + 10] ] + 1;
+
+        //endif;
+        //code3
+        //[[PROCESS_TABLE + childPID*16 + 14]+12]=[PROCESS_TABLE + [PROCESS_TABLE +childPID*16+2]*16 + 14]+12];
+        //[[PROCESS_TABLE + childPID*16 + 14]+13]=[PROCESS_TABLE + [PROCESS_TABLE +childPID*16+2]*16 + 14]+13];
+        //increment share count if code page alloc
+        //if([ [PROCESS_TABLE + [PROCESS_TABLE +childPID*16+2]*16 + 14]+12] != -1) then
+        //[MEMORY_FREE_LIST + [[PROCESS_TABLE + [PROCESS_TABLE +childPID*16+2]*16 + 14] + 12] ]=[[MEMORY_FREE_LIST + [[PROCESS_TABLE + [PROCESS_TABLE +childPID*16+2]*16 + 14] + 12] ] + 1;
+
+       // endif;
+
+
+        //code4
+        //[[PROCESS_TABLE + childPID*16 + 14]+14]=[PROCESS_TABLE + [PROCESS_TABLE +childPID*16+2]*16 + 14]+14];
+        //[[PROCESS_TABLE + childPID*16 + 14]+15]=[PROCESS_TABLE + [PROCESS_TABLE +childPID*16+2]*16 + 14]+15];
+        //increment share count if code page alloc
+        //if([ [PROCESS_TABLE + [PROCESS_TABLE +childPID*16+2]*16 + 14]+14] != -1) then
+        //[MEMORY_FREE_LIST + [[PROCESS_TABLE + [PROCESS_TABLE +childPID*16+2]*16 + 14]+14] ]=[MEMORY_FREE_LIST + [ [PROCESS_TABLE + [PROCESS_TABLE +childPID*16+2]*16 + 14]+14] ] + 1;
+
+        //endif;

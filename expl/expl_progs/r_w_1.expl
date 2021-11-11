@@ -1,0 +1,95 @@
+type
+Share
+{
+  int isempty;
+  int data;
+}
+endtype
+
+decl
+  Share head;
+enddecl
+
+int main()
+{
+decl
+  int temp, x, pidone, pidtwo, semid, iter, counter1,counter2,counter3;
+enddecl
+
+begin
+  x = exposcall("Heapset");
+  semid = exposcall("Semget");
+  head = exposcall("Alloc", 2);
+  head.isempty = 1;
+  pidone = exposcall("Fork");
+
+  if (pidone == 0) then
+    iter = 1;
+    while(iter <= 100) do
+      temp = exposcall("SemLock", semid);
+      temp = head.isempty;
+
+      if(temp == 1) then
+        head.data = iter;
+        head.isempty = 0;
+        iter = iter + 2;
+      endif;
+
+      temp = exposcall("SemUnLock", semid);
+
+      counter1 = 0;
+      while(counter1 < 50) do
+        counter1 = counter1 + 1;
+	temp = exposcall("Write", -2, "cnt1");
+      endwhile;
+    endwhile;
+  else
+    pidtwo =  exposcall("Fork");
+
+    if(pidtwo == 0) then
+      iter = 2;
+      while(iter <= 100) do
+        temp = exposcall("SemLock", semid);
+        temp = head.isempty;
+
+        if(temp == 1) then
+          head.data = iter;
+          head.isempty = 0;
+          iter = iter + 2;
+        endif;
+
+        temp = exposcall("SemUnLock", semid);
+	counter2 = 0;
+      while(counter2 < 50) do
+        counter2 = counter2 + 1;
+	temp = exposcall("Write", -2, "cnt2");
+      endwhile;
+    endwhile;
+    else
+      iter = 1;
+      while(iter <= 100) do
+        temp = exposcall("SemLock", semid);
+        temp = head.isempty;
+
+        if(temp == 0) then
+          x = head.data;
+          head.isempty = 1;
+          temp = exposcall("Write", -2, x);
+          iter = iter + 1;
+        endif;
+
+        temp = exposcall("SemUnLock", semid);
+	counter3 = 0;
+      	while(counter3 < 50) do
+        	counter3 = counter3 + 1;
+		temp = exposcall("Write", -2, "cnt3");
+      	endwhile;
+    endwhile;
+    endif;
+  endif;
+
+  temp = exposcall("Semrelease", semid);
+  return 0;
+end
+}
+

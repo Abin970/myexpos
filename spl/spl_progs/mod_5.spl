@@ -1,0 +1,77 @@
+[82*512-2]=[82*512-2]+1;
+alias currPID R0;
+currPID = [SYSTEM_STATUS_TABLE + 1];
+//R15="mod_5";
+//print R15;
+//R15="currPID";
+//print R15;
+//print [SYSTEM_STATUS_TABLE+1];
+multipush (BP);
+alias process_table_entry R1;
+process_table_entry = PROCESS_TABLE + currPID * 16;
+[process_table_entry + 12] = SP%512;
+[process_table_entry + 14] = PTBR;
+[process_table_entry + 15] = PTLR;
+
+//if([PROCESS_TABLE + [SYSTEM_STATUS_TABLE+1]*16 + 4]==TERMINATED) then
+//	R15="trm";
+//	print R15;
+//endif;
+//if([PROCESS_TABLE + [SYSTEM_STATUS_TABLE+1]*16 + 4]==WAIT_SEMAPHORE) then
+        //R15="sem_wait";
+        //print R15;
+//endif;
+alias newPID R2;
+
+if(currPID == 15 || currPID == 0) then
+newPID = 1;
+else
+newPID  = currPID + 1;
+endif;
+
+alias pid_cnt R14;
+pid_cnt = 0;
+process_table_entry = PROCESS_TABLE + newPID * 16;
+while( ([process_table_entry + 4] != CREATED) 
+&& ([process_table_entry + 4] != READY) 
+&& (pid_cnt != 15) ) do
+	if(newPID == 15) then
+		newPID = 1;
+	else
+		newPID  = newPID + 1;
+	endif;
+	pid_cnt = pid_cnt + 1;
+	process_table_entry = PROCESS_TABLE + newPID * 16;
+endwhile;
+process_table_entry = PROCESS_TABLE + newPID * 16;
+if( (pid_cnt == 15) 
+&& ([process_table_entry + 4]!= READY)
+&& ([process_table_entry + 4]!= CREATED)) then
+	newPID = 0;
+endif;
+
+process_table_entry = PROCESS_TABLE + newPID * 16;
+SP = [process_table_entry + 11]*512 + [process_table_entry + 12];
+PTBR = [process_table_entry + 14];
+PTLR = [process_table_entry + 15];
+
+[SYSTEM_STATUS_TABLE + 1] = newPID;
+
+
+if([process_table_entry + 4] == CREATED) then
+        [process_table_entry + 4] = RUNNING;
+        SP = [process_table_entry + 13];
+	[process_table_entry + 9] = 0;
+	R15="newPID";
+	print R15;
+	print R2;
+	breakpoint;
+	BP=[ [PROCESS_TABLE + newPID*16 + 11]*512 + [PROCESS_TABLE + newPID*16 + 12] ];
+        ireturn;
+endif;
+[process_table_entry + 4] = RUNNING;
+multipop (BP);
+//R15="newPID";
+//print R15;
+//print [SYSTEM_STATUS_TABLE+1];
+return;

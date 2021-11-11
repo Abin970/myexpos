@@ -1,0 +1,46 @@
+decl
+	int a[100];
+enddecl
+int main(){
+decl	
+	int m,i,temp,j,max;
+	str s;
+enddecl
+begin
+	s="array size";
+	temp=exposcall("Write",-2,s);
+	temp=exposcall("Read",-1,m);
+	s="array eles";
+	temp=exposcall("Write",-2,s);
+	i=0;
+	while(i < m) do
+	
+		temp=exposcall("Read",-1,a[i]);
+	
+	i=i+1;
+	endwhile;
+	i=0;
+	while(i < m) do
+		j=0;
+		while(j < (m - 1 - i)) do
+			if( a[j] > a[j+1] ) then
+				temp = a[j+1];
+				a[j+1] = a[j];
+				a[j] = temp;
+			endif;	
+		j = j + 1;	
+		endwhile;
+		
+	i = i + 1;
+	endwhile;
+
+	i=0;
+        while(i < m) do
+
+                temp=exposcall("Write",-2,a[i]);
+
+        i=i+1;
+        endwhile;
+	return 0;
+end
+}

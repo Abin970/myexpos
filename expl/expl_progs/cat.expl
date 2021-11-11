@@ -1,0 +1,27 @@
+int main(){
+	decl
+	int temp, fdscptr, frRet;
+	string filename,data;
+	enddecl
+begin
+	temp=exposcall("Write",-2,"filename:");
+        temp=exposcall("Read",-1,filename);
+	
+	fdscptr=exposcall("Open",filename);
+
+	if(fdscptr<0) then
+		
+		temp=exposcall("Write",-2,"failure");
+	else
+		frRet=exposcall("Read",fdscptr,data);
+		while(frRet==0) do
+			temp=exposcall("Write",-2,data);
+			frRet=exposcall("Read",fdscptr,data);
+		endwhile;
+		temp=exposcall("Write",-2,"read_fail");
+		temp=exposcall("Write",-2,frRet);
+	endif;
+	temp=exposcall("Close",fdscptr);
+return 0;
+end
+}

@@ -1,0 +1,41 @@
+int main(){
+
+	decl
+		str comm;
+		int temp,pid,p,ext;
+	enddecl
+
+	begin
+	p=1;
+	while(p==1) do
+	temp=exposcall("Write",-2,">");
+	temp=exposcall("Read",-1,comm);
+	if(comm!="Shutdown") then
+		pid=exposcall("Fork");
+		if(pid<0) then
+			temp=exposcall("Write",-2,"Fork Failure");
+			continue;
+		endif;
+		temp=exposcall("Write",-2,"pid");
+		temp=exposcall("Write",-2,pid);
+		if(pid!=0) then
+                ext=exposcall("Wait",temp);
+       		else
+                ext=exposcall("Exec",comm);
+		temp=exposcall("Write",-2,"ext");
+		temp=exposcall("Wrtie",-2,ext);
+                	if(ext==-1) then
+				
+                        	temp=exposcall("Write",-2,"BAD COMMAND");
+				break;
+                	endif;
+        	endif;
+	else
+		temp=exposcall("Shutdown");
+		break;
+	endif;
+	endwhile;
+	
+return 0;	
+	end
+}

@@ -1,0 +1,49 @@
+// set the MODE FLAG in process table using pid from sys status table
+[PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1] * 16 + 9] = 5;
+//
+alias userSP R0;
+userSP = SP;
+// switch from user stack to kernel stack
+//	save the value of SP in the user SP field of Process Table 
+[PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1]*16 + 13] = SP;
+//	set the value of SP to kernel stack
+SP = [PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1]*16 + 11]*512 - 1;
+//	IP+2
+//	Return Value
+//	Arg3
+//	Arg2
+//	Arg1
+//	sys call num
+alias physicalPageNum R1;
+alias offset R2;
+alias fileDescPhysicalAddr R3;
+physicalPageNum = [PTBR + 2 *((userSP - 4)/512)];
+offset  = (userSP - 4)% 512;
+fileDescPhysicalAddr = (physicalPageNum * 512) + offset;
+alias fileDescriptor R4;
+fileDescriptor = [fileDescPhysicalAddr];
+
+if(fileDescriptor != -2)
+then
+	//store -1 as return value in userSP-1
+	alias physicalAddrRetVal  R5;
+	physicalAddrRetVal = ( [PTBR + 2 * ((userSP - 1) / 512) ] * 512) + ((userSP -1)%512 );
+	[physicalAddrRetVal] = -1;
+else
+	//code when argument 1 is valid
+	//Calculate physical address of the argument 2 and extract the value from it
+	//which is the world to be printed to the console
+	alias word R5;
+	//extract the word in arg3
+	word = [[PTBR + 2*((userSP -3 )/512)]*512 + ((userSP - 3)%512) ];
+	print word;
+	alias physicalAddrRetVal R6;
+	physicalAddrRetVal = ( [PTBR + 2 *((userSP - 1)/512) ]*512) + ((userSP -1)%512 );
+        [physicalAddrRetVal] = 0;
+endif;
+
+SP = [PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1]*16 + 13] ;// or from the user SP field of porcess table
+//Reset the MODE FLAG to 0 i.e. user mode
+[PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1]*16 + 9]=0;
+breakpoint;
+ireturn;

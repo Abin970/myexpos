@@ -1,0 +1,164 @@
+//R15="int9";
+//print R15;
+alias userSP R0;
+userSP = SP;
+[PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1]* 16 + 13 ] = SP;
+[PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1]* 16 + 9 ]  = 9;
+SP = [PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1]*16 + 11]*512 - 1;
+//sys call 9
+[PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1]*16 + 9] = 9;
+
+//IP+2	<---	userSP
+//ret space
+//arg3
+//arg2
+//arg1	-	filename
+//sys call #
+
+alias file_name R1;
+alias ret R2;
+file_name = userSP - 4;
+ret = userSP-1;
+ret = [ [PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1]*16 + 14] + 2*(ret/512) ]*512 + (ret%512);
+file_name = [ [PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1]*16 + 14] + 2*(file_name/512) ]*512 + (file_name%512);
+
+file_name = [file_name];
+
+alias f_idx R3;
+alias file_flg R14;
+f_idx=0;
+file_flg=0;
+while(f_idx < MAX_FILE_NUM) do
+	//not sure to check format 	
+	if([INODE_TABLE + f_idx*16 + 1] == file_name) then
+	file_flg = 1;
+	break;	
+	endif;
+	f_idx =f_idx + 1;
+endwhile;
+
+if(file_flg == 0) then 
+	[ret] = -1;
+	ireturn;
+endif;
+
+multipush(R0,R1,R2,R3);
+//R0 ret
+//R1 f#
+//R2 PID
+//R3
+
+R1 = 3;
+R2 = [SYSTEM_STATUS_TABLE + 1];
+call MOD_1;
+multipop(R0,R1,R2,R3);
+
+alias u_ar_PG R4;
+u_ar_PG =[PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1]* 16 + 11];
+
+[MEMORY_FREE_LIST + u_ar_PG] = [MEMORY_FREE_LIST + u_ar_PG] + 1;
+alias per_p_rtb R5;
+alias per_p_off R6;
+per_p_rtb = [PROCESS_TABLE +[SYSTEM_STATUS_TABLE+1]*16 +11]*512+ 496;
+per_p_off = 0;
+while(per_p_off < 8) do
+	[per_p_rtb + per_p_off]=-1;
+	per_p_off=per_p_off+1;
+endwhile;
+[SYSTEM_STATUS_TABLE + 2 ] = [SYSTEM_STATUS_TABLE + 2] - 1;
+
+SP = [PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1]* 16 + 11]*512 - 1;
+
+[PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1]* 16 + 4] = RUNNING;
+
+[PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1]* 16 + 7] = f_idx;
+
+PTBR = [PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1]*16 + 14];
+
+alias disk_off R12;
+alias  pg_off R14;
+alias  ind_entr R13;
+
+//Library
+[PTBR+0] = 63;
+[PTBR+1] = "0100";
+[PTBR+2] = 64;
+[PTBR+3] = "0100";
+[PTBR+4] = -1;
+[PTBR+5] = "0000";
+[PTBR+6] = -1;
+[PTBR+7] = "0000";
+//initialize disk map table of currPID
+disk_off=0;
+ind_entr=8;
+while(disk_off < 10) do
+	if(disk_off >3 && disk_off<8) then
+		[DISK_MAP_TABLE + [SYSTEM_STATUS_TABLE+1]*10 + disk_off ] = [INODE_TABLE + f_idx*16 + ind_entr];
+		ind_entr=ind_entr+1;
+	else
+        	[DISK_MAP_TABLE + [SYSTEM_STATUS_TABLE+1]*10 + disk_off ]=-1;
+	endif;
+        disk_off=disk_off+1;
+endwhile;
+
+pg_off=8;
+ind_entr = 8;
+//mem page alloc
+while(pg_off < 20) do
+	//code offset
+	if( (pg_off > 7) && (pg_off < 16) ) then
+		if(pg_off==8 && ([INODE_TABLE + f_idx*16 + ind_entr] != -1)  ) then
+			multipush(R0,R1,R2,R3,R13,R14);
+			//call get code page
+			R2=[INODE_TABLE + f_idx*16 + ind_entr];
+			R1=5;
+			call MOD_2;
+			[PTBR + [SP]]=R0;
+			//print [SP];
+			//print R0;
+			multipop(R0,R1,R2,R3,R13,R14);
+			ind_entr = ind_entr + 1;
+			[PTBR + pg_off +1] = "0100";
+		endif;
+			pg_off = pg_off + 2;
+			continue; 
+	else 
+		[PTBR + pg_off +1] = "0110";	
+	endif;
+	multipush(R0,R1,R2,R3,R13,R14);
+	R1=1;
+        call MOD_2;
+        [PTBR + [SP]] = R0;
+	multipop(R0,R1,R2,R3,R13,R14);
+pg_off = pg_off + 2;
+endwhile;
+// load code blocks into mem
+//alias mem R12;
+//alias block R11;
+
+//pg_off=8;
+//ind_entr=8;
+//while(pg_off < 16) do
+//
+//	mem=[PTBR + pg_off];
+//	breakpoint;
+//	block=[INODE_TABLE + f_idx*16 + ind_entr];
+//	print R11;
+//	if((mem!=-1) && (block!=-1)) then
+//	multipush(R0,R1,R2,R3,R4,R11,R12,R13,R14);
+//	R1=2;
+//	R2=[SYSTEM_STATUS_TABLE +1];
+//	R3=mem;
+//	R4=block;
+//	call MOD_4;
+//	multipop(R0,R1,R2,R3,R4,R11,R12,R13,R14);
+//	ind_entr=ind_entr+1;
+//	endif;
+//pg_off = pg_off + 2;
+//endwhile;
+[ [PTBR + 16]*512 ] = [ [PTBR + 8]*512 + 1];
+//SP = [PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1]* 16 + 13 ];
+[PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1]* 16 + 9 ]  = 0;
+SP=8*512;
+//breakpoint;
+ireturn;

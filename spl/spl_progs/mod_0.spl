@@ -1,0 +1,228 @@
+//R3 sem_idx/inode_index
+//R2 PID
+//R1 f_num
+//R0 ret
+
+//R15="mod_0";
+//print R15;
+//R15="f#";
+//print R15;
+//print R1;
+alias f_num R1;
+alias currPID R2;
+alias ret R0;
+//wait terminal
+if(f_num == 8) then
+	while([TERMINAL_STATUS_TABLE] == 1) do
+		[ PROCESS_TABLE + currPID*16 + 4] = WAIT_TERMINAL;
+		//multipush(R1,R2);
+		call MOD_5;
+		//shdlr->n_p->trl release->curr_p
+		//multipop(R1,R2);	
+	endwhile;
+	[TERMINAL_STATUS_TABLE] = 1;
+	[TERMINAL_STATUS_TABLE + 1] = [SYSTEM_STATUS_TABLE + 1]; //currPID	
+	return;
+endif;
+//release terminal
+if(f_num == 9) then
+	if(currPID == [TERMINAL_STATUS_TABLE + 1]) then
+	[TERMINAL_STATUS_TABLE] = 0;
+	alias PID R3;
+	PID = 1;
+	//alias process_table_entry R4;
+        //process_table_entry = [PROCESS_TABLE + PID*16 + 4];
+	while( PID < 16) do
+	if([PROCESS_TABLE + PID*16 + 4] == WAIT_TERMINAL) then
+		[PROCESS_TABLE + PID*16 + 4] = READY;
+	endif;
+	PID = PID + 1;	
+	endwhile;
+	ret = 0;
+	
+	
+else 
+	ret = -1;	
+	endif;
+	return;
+endif;
+
+//aquire disk
+if(f_num ==3 ) then
+	while([DISK_STATUS_TABLE] == 1) do
+		[PROCESS_TABLE + currPID*16 + 4] = WAIT_DISK;
+		call MOD_5;
+	endwhile;
+	[82*512-3]=[82*512-3]+1;
+	[DISK_STATUS_TABLE]=1;
+	[DISK_STATUS_TABLE+5]=currPID;
+	return;
+endif;
+
+//Acquire Semaphore
+if(f_num == 6) then
+	//R15="mod0";
+	//print R15;
+	//print R1;
+
+        alias sem_idx R3;
+        sem_idx=0;
+        while(sem_idx<MAX_SEM_COUNT && [SEMAPHORE_TABLE + 4*sem_idx]!=-1) do
+                sem_idx=sem_idx+1;
+        endwhile;
+        if(sem_idx<MAX_SEM_COUNT && [SEMAPHORE_TABLE + 4*sem_idx]==-1) then
+                [SEMAPHORE_TABLE + 4*sem_idx]=currPID;
+                [SEMAPHORE_TABLE + 4*sem_idx +1]=1;
+                R0=sem_idx;
+        else
+                R0=-1;
+        endif;
+	//breakpoint;
+        return;
+endif;
+//release Semaphore
+if(f_num ==7) then
+	//R15="mod0";
+	//print R15;
+	//print R1;
+
+        alias sem_idx R3;
+	alias sem_tb_entry R13;
+	sem_tb_entry= SEMAPHORE_TABLE + 4*sem_idx;
+        if([sem_tb_entry]==[SYSTEM_STATUS_TABLE+1]) then
+                [sem_tb_entry]=-1;
+                alias pt_idx R14;
+                pt_idx=0;
+		alias ptb_entry R12;
+		ptb_entry=PROCESS_TABLE + pt_idx*16;
+                while(pt_idx<16) do
+                        if([ptb_entry + 4]==WAIT_SEMAPHORE && [ptb_entry + 5]==sem_idx) then
+                                [ptb_entry + 4]=READY;
+                                [ptb_entry + 5]=-1;
+                        endif;
+                pt_idx=pt_idx+1;
+		ptb_entry=PROCESS_TABLE + pt_idx*16;
+                endwhile;
+                [sem_tb_entry +1]=[sem_tb_entry +1]-1;
+        endif;
+
+        return;
+endif;
+
+
+//acquire Inode
+if(f_num ==4) then
+	//R15="mod0";
+	//print R15;
+	//R15="acq_ind";
+	//print R15;
+	//print R3;
+	alias inode_index R3;
+	//lock by same process mostly won't  be issue
+	//breakpoint;
+	while([FILE_STATUS_TABLE + 4*inode_index + 0]!=-1) do
+		[PROCESS_TABLE + currPID*16 + 4]=WAIT_FILE;
+		[PROCESS_TABLE + currPID*16 + 5]=inode_index;
+		multipush(R2,R3);
+		call MOD_5;
+		multipop(R2,R3);
+	endwhile;
+
+	//file might be deleted by the time the inode was acquired
+	if([INODE_TABLE + 16*inode_index + 1]==-1) then
+		R0=-1;
+		return;	
+	endif;
+		
+	[FILE_STATUS_TABLE + 4*inode_index + 0]=currPID;
+	R0=0;
+	return;
+endif;
+
+//Release Inode
+if(f_num ==5) then
+	//R15="mod0";
+        //print R15;
+        //R15="rel_ind";
+        //print R15;
+	//print R3;
+	alias inode_index R3;
+	if([FILE_STATUS_TABLE + 4*inode_index + 0]==currPID) then
+		[FILE_STATUS_TABLE + 4*inode_index + 0]=-1;
+		alias pt_index R14;
+		pt_index=0;
+		while(pt_index<16) do
+			if([PROCESS_TABLE + pt_index*16 + 4]==WAIT_FILE 
+				&& [PROCESS_TABLE + pt_index*16 + 5]==inode_index) then
+				[PROCESS_TABLE + pt_index*16 + 4]=READY;
+				[PROCESS_TABLE + pt_index*16 + 5]=-1;
+			endif;
+		pt_index=pt_index+1;
+		endwhile;	
+		R0=0;
+		
+	else	
+		R0=-1;
+		
+	endif;
+	return;
+	
+endif;
+//R3	buff_no
+//R2	PID
+//acquire_buffer()
+if(f_num==ACQUIRE_BUFFER) then
+	//R15="aqr_buff";
+	//print R15;
+	//R15="a_buff_no";
+	//print R15;
+	//print R3;
+	alias buff_no R3;
+	alias PID R2;
+	//only 1st condtion is necessary
+	while([BUFFER_TABLE + 4*buff_no + 2]!=-1 &&  [BUFFER_TABLE + 4*buff_no + 2]!=PID) do
+		//R15="buff_wait";
+		//print R15;
+		//breakpoint;
+		[PROCESS_TABLE + 16*PID + 4]=WAIT_BUFFER;
+		[PROCESS_TABLE + 16*PID + 5]=buff_no;
+		multipush(R2,R3);
+			call MOD_5;
+		multipop(R2,R3);
+	endwhile;
+	[BUFFER_TABLE + 4*buff_no + 2]=PID;
+	return;
+endif;
+
+//R2
+//R1 PID
+//release_buffer()
+if(f_num==RELEASE_BUFFER) then
+	//R15="rel_buff";
+        //print R15;
+        //R15="r_buff_no";
+        //print R15;
+        //print R3;
+	alias buff_no R3;
+	alias PID R2;
+	if([BUFFER_TABLE + 4* buff_no + 2]==PID) then
+		[BUFFER_TABLE + 4*buff_no + 2]=-1;
+		alias pt_off R14;
+		pt_off=0;
+		alias ptb_entry R13;
+		ptb_entry= PROCESS_TABLE + pt_off*16;
+		while(pt_off<16) do
+			if([ptb_entry + 4]==WAIT_BUFFER && [ptb_entry +5]==buff_no) then
+				[ptb_entry + 4]=READY;
+				[ptb_entry + 5]="";
+			endif;
+		pt_off=pt_off+1;
+`		ptb_entry= PROCESS_TABLE + pt_off*16;
+		endwhile;
+		R0=0;
+	
+	else
+		R0=-1;
+	endif;
+	return;
+endif;

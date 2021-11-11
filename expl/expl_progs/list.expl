@@ -1,0 +1,87 @@
+type
+linkedlist{
+	int data;
+	linkedlist next;
+}
+endtype
+
+decl 
+	linkedlist createnode(int n), insertnode(linkedlist head, linkedlist node);
+	int deletelist(linkedlist head);
+
+enddecl
+
+linkedlist createnode(int n){
+	decl
+		linkedlist node;
+	enddecl
+begin
+	node=exposcall("Alloc");
+	node.data=n;
+	node.next=null;
+	return node;
+end	
+}
+
+linkedlist insertnode(linkedlist head, linkedlist node){
+begin
+	if(head == null) then
+		head=node;
+	else
+		node.next=head;
+		head=node;
+	endif;
+	return head;
+end
+}
+
+int deletelist(linkedlist head){
+	decl
+	linkedlist temp;
+	int t;
+	enddecl
+begin
+	while(head != null) do
+		temp=head;
+		head=head.next;
+		t=exposcall("Free",temp);
+		breakpoint;
+	endwhile;
+	return 0;
+end
+}
+int main(){
+decl
+	int n,temp,i,x;
+	linkedlist head,node,tnode;
+enddecl
+begin
+	temp=initialize();
+	temp=exposcall("Write",-2,"no of nodes:");
+	temp=exposcall("Read",-1,n);
+	i=0;
+	temp=exposcall("Write",-2,"nodes:");
+	while(i<n) do
+		temp=exposcall("Read",-1,x);
+		node=createnode(x);
+		head=insertnode(head,node);
+	node=null;
+	i=i+1;	
+	endwhile;
+	i=0;
+	node=head;
+	while(i < n) do
+		temp=exposcall("Write",-2,node.data);
+		node=node.next;	
+	i=i+1;
+	endwhile;
+	//temp=deletelist(head);	
+	while(head != null) do
+                tnode=head;
+                head=head.next;
+                temp=exposcall("Free",tnode);
+                breakpoint;
+        endwhile;
+return 0;
+end
+}

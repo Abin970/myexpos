@@ -1,0 +1,166 @@
+// set the MODE FLAG in process table using pid from sys status table
+[PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1] * 16 + 9] = 5;
+//
+alias userSP R0;
+userSP = SP;
+// switch from user stack to kernel stack
+//      save the value of SP in the user SP field of Process Table 
+[PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1]*16 + 13] = SP;
+//      set the value of SP to kernel stack
+SP = [PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1]*16 + 11]*512 - 1;
+//      IP+2
+//      Return Value
+//      Arg3
+//      Arg2(word to be written)
+//      Arg1(file_dsptr)
+//      sys call num
+
+//R15="int7";
+//print R15;
+userSP=[PTBR + 2*(userSP/512)]*512 + userSP%512;
+alias file_dsptr R1;
+alias word R2;
+alias ret R3;
+//physicalPageNum = [PTBR + 2 *((userSP - 4)/512)];
+//offset  = (userSP - 4)% 512;
+//fileDescPhysicalAddr = (physicalPageNum * 512) + offset;
+//alias fileDescriptor R4;
+file_dsptr = [userSP-4];
+ret=userSP-1;
+word=[userSP-3];
+//R15="fdsptr";
+//print R15;
+//print R1;
+if(file_dsptr != -2)  then
+	alias pprt R14;
+	pprt=[PROCESS_TABLE + [SYSTEM_STATUS_TABLE+1]*16 + 11]*512 + RESOURCE_TABLE_OFFSET;
+       if(file_dsptr>-1 && file_dsptr<8) then
+		if([pprt + 2*file_dsptr + 0]==FILE) then
+                        alias oft_index R13;
+                        oft_index=[pprt + 2*file_dsptr + 1];
+                        alias inode_off R12;
+                        inode_off=[OPEN_FILE_TABLE + 4*oft_index + 0];
+                        if([PROCESS_TABLE + [SYSTEM_STATUS_TABLE+1]*16 + 3]==1) then
+
+				//call acquire_inode()
+        	                multipush(R2,R3,R12,R13,R14);
+                	                R1=ACQUIRE_INODE;
+                        	        R2=[SYSTEM_STATUS_TABLE+1];
+                                	R3=inode_off;
+                               		call MOD_0;
+					alias acq_ind_ret R15;
+					acq_ind_ret=R0;
+				multipop(R2,R3,R12,R13,R14);
+				if(acq_ind_ret==0) then
+					alias lseek R11;
+                               		lseek=[OPEN_FILE_TABLE + 4*oft_index + 2];
+					//R15="lseek";
+					//print R15;
+					//print R11;
+                                	//alias phy_add_buff R10;
+                                	//phy_add_buff=[PTBR + 2*(lg_add_buff/512)]*512 + lg_add_buff%512;
+					if(lseek!=MAX_FILE_SIZE) then
+						
+						if(lseek%512==0 && lseek==[INODE_TABLE + 16*inode_off + 2]) then
+							
+							multipush(R2,R3,R11,R12,R13,R14);
+								R1=GET_FREE_BLOCK;
+								call MOD_2;
+								alias g_b_ret R15;
+								g_b_ret=R0;
+							multipop(R2,R3,R11,R12,R13,R14);
+							if(g_b_ret>-1) then
+								//R0="fre_blk";
+								//print R0;
+								//print R15;
+								[INODE_TABLE + 16*inode_off + (8+lseek/512)]=g_b_ret;	
+	
+							else
+								//release_inode()
+                        	                        multipush(R0,R1,R2,R3,R4);
+                                	                        R1=RELEASE_INODE;
+                                        	                R2=[SYSTEM_STATUS_TABLE+1];
+                                                	        R3=inode_off;
+                                                	        call MOD_0;
+                                               		multipop(R0,R1,R2,R3,R4);
+                                                		[ret]=-2;
+								SP = [PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1]*16 + 13] ;// or from the user SP field of porcess table
+//Reset the MODE FLAG to 0 i.e. user mode
+								[PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1]*16 + 9]=0;
+					
+								ireturn;
+							endif;
+						
+						endif;
+					
+						multipush(R2,R3,R11,R12,R13,R14);
+							R1=BUFFERED_WRITE;
+							R4=word;
+							R2=[INODE_TABLE + 16*inode_off + (8+lseek/512)];
+							R3=lseek%512;
+							
+							call MOD_3;
+						multipop(R2,R3,R11,R12,R13,R14);
+						if(lseek==[INODE_TABLE + 16*inode_off + 2]) then
+							//R15="fs++";
+							//print R15;
+							[INODE_TABLE + 16*inode_off + 2]=[INODE_TABLE + 16*inode_off + 2]+1;
+							[ROOT_FILE + 8*inode_off+ 1]=[ROOT_FILE + 8*inode_off +1]+1;
+						else
+							breakpoint;	
+						endif;
+						
+						[OPEN_FILE_TABLE + 4*oft_index + 2]=[OPEN_FILE_TABLE + 4*oft_index + 2]+1;
+						//release_inode()
+                                                multipush(R0,R1,R2,R3,R4);
+                                                        R1=RELEASE_INODE;
+                                                        R2=[SYSTEM_STATUS_TABLE+1];
+                                                        R3=inode_off;
+                                                        call MOD_0;
+                                                multipop(R0,R1,R2,R3,R4);
+                                                        [ret]=0;
+					else
+							//lseek===MAX_FILE_SIZE
+							//release_inode()
+                                                        multipush(R0,R1,R2,R3,R4);
+                                                                R1=RELEASE_INODE;
+                                                                R2=[SYSTEM_STATUS_TABLE+1];
+                                                                R3=inode_off;
+                                                                call MOD_0;
+                                                        multipop(R0,R1,R2,R3,R4);
+                                                                [ret]=-2;
+						
+					endif;
+				else
+					[ret]=-1;
+				endif;
+			else
+				[ret]=-3;
+			endif;
+		else
+				[ret]=-1;
+		endif;
+	else 
+		[ret]=-1;
+	endif;
+
+
+
+else
+
+	multipush(R0,R1,R2,R3);	//push necessary regs
+	R1 = 3;
+	R3 = word;
+	R2 = [SYSTEM_STATUS_TABLE + 1];
+	call MOD_4;
+	multipop(R0,R1,R2,R3);
+
+        [ret] = 0;
+endif;
+
+SP = [PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1]*16 + 13] ;// or from the user SP field of porcess table
+//Reset the MODE FLAG to 0 i.e. user mode
+[PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1]*16 + 9]=0;
+//breakpoint;
+ireturn;
+

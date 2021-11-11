@@ -1,0 +1,105 @@
+//	IP+2	<---SP
+//	return val
+//	arg3
+//	arg2
+//	arg1
+//	sys call num
+//R15="int14";
+//print R15;
+//R15="pid";
+//print R15;
+//print [SYSTEM_STATUS_TABLE+1];
+
+alias syscall_num R1;
+alias userSP R0;
+userSP=SP;
+alias ret R5;
+ret=[PTBR+2*((userSP-1)/512)]*512+(userSP-1)%512;
+syscall_num=[PTBR + 2*((userSP-5)/512)]*512+(userSP-5)%512;
+syscall_num=[syscall_num];
+
+[PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1]*16 + 13] = SP;
+
+SP = [PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1]*16 + 11]*512 - 1;
+[PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1] * 16 + 9]=syscall_num;
+//R15="sys#";
+//print R15;
+//print R1;
+//Semlock
+
+if(syscall_num==19) then
+	alias SEMID R2;
+	//SEMID is index of per_process table
+	alias pp_rs_tb R3;
+        pp_rs_tb=([PROCESS_TABLE + [SYSTEM_STATUS_TABLE+1]*16 + 11]+1)*512-16;
+	SEMID=[PTBR + 2*((userSP-4)/512)]*512+(userSP-4)%512;
+	SEMID=[SEMID];
+	if(SEMID<8 && SEMID>-1 && [ pp_rs_tb + 2*SEMID]==SEMAPHORE) then
+		//R15="locked_pid";
+		//print R15;
+		//print [SEMAPHORE_TABLE + [ pp_rs_tb + 2*SEMID +1]*4 ];
+		while([SEMAPHORE_TABLE + [ pp_rs_tb + 2*SEMID +1]*4 ]!=-1 &&
+[SEMAPHORE_TABLE + [ pp_rs_tb + 2*SEMID +1]*4 ]!=[SYSTEM_STATUS_TABLE +1]) do
+				
+			[PROCESS_TABLE +  [SYSTEM_STATUS_TABLE+1]*16 + 4]=WAIT_SEMAPHORE;
+			[PROCESS_TABLE + [SYSTEM_STATUS_TABLE+1]*16 +5]=[ pp_rs_tb + 2*SEMID +1];
+			multipush(R0,R1,R2,R3,R4,R5);
+			call MOD_5;
+			multipop(R0,R1,R2,R3,R4,R5);
+		endwhile;
+		//R15="semlock_pid";
+		//print R15;
+		//print [SYSTEM_STATUS_TABLE + 1];	
+		[SEMAPHORE_TABLE + [ pp_rs_tb + 2*SEMID +1]*4 ]=[SYSTEM_STATUS_TABLE +1];
+		[ret]=0;
+	else
+		[ret]=-1;
+	endif;
+		
+endif;
+
+//SemUnlock
+if(syscall_num==20) then
+	alias SEMID R2;
+        //SEMID is index of per_process table
+        alias pp_rs_tb R3;
+        pp_rs_tb=([PROCESS_TABLE + [SYSTEM_STATUS_TABLE+1]*16 + 11]+1)*512-16;
+        SEMID=[PTBR + 2*((userSP-4)/512)]*512+(userSP-4)%512;
+        SEMID=[SEMID];
+        if(SEMID<8 && SEMID>-1 && [ pp_rs_tb + 2*SEMID]==SEMAPHORE) then
+		//R15="locked_pid";
+		//print R15;
+		//print [SEMAPHORE_TABLE + [ pp_rs_tb + 2*SEMID +1]*4 ];	
+		if([SEMAPHORE_TABLE + 4*[ pp_rs_tb + 2*SEMID +1] ]!=-1) then
+			if([SEMAPHORE_TABLE + 4*[ pp_rs_tb + 2*SEMID +1] ]==[SYSTEM_STATUS_TABLE+1]) then
+				[SEMAPHORE_TABLE + 4*[ pp_rs_tb + 2*SEMID +1] ]=-1;
+				//R15="unlockpid";
+				//print R15;
+				//print [SYSTEM_STATUS_TABLE+1];
+				alias pt_idx R14;
+                		pt_idx=0;
+                		while(pt_idx<16) do
+                        		if([PROCESS_TABLE +pt_idx*16 + 4]==WAIT_SEMAPHORE && [PROCESS_TABLE + pt_idx*16 + 5]==[ pp_rs_tb + 2*SEMID +1]) then
+                                		//print R14;
+						[PROCESS_TABLE + pt_idx*16 + 4]=READY;
+                                		[PROCESS_TABLE + pt_idx*16 + 5]=-1;
+                        		endif;
+                			pt_idx=pt_idx+1;
+                		endwhile;
+				[ret]=0;
+			else
+				[ret]=-2;
+			endif;
+		endif;
+	else
+		[ret]=-1;
+	endif;
+endif;	
+
+
+SP=[PROCESS_TABLE + [SYSTEM_STATUS_TABLE+1]*16 + 13];
+
+[PROCESS_TABLE + [SYSTEM_STATUS_TABLE+1]*16 + 9]=0;
+
+ireturn;
+

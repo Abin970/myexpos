@@ -1,0 +1,34 @@
+//extract sys call num and args from usr stack
+//set mode file
+//usr -> ker stack
+//breakpoint;
+[PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1]*16 + 13] = SP;
+
+SP = [PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1]*16 + 11]*512 - 1;
+
+backup;
+
+//[TERMINAL_STATUS_TABLE] = 0;
+//R14="cn-int";
+//print R14;
+
+alias req_PID R14 ;
+req_PID = [TERMINAL_STATUS_TABLE + 1];
+
+[PROCESS_TABLE + req_PID*16 + 8] = P0;
+
+//call release_terminal()
+multipush(R14);
+//set up the reg for the call
+//f# = 9 in R1
+//currPID in R2
+R1 = 9;
+R2 = req_PID;
+call MOD_0;
+//ignore return
+multipop(R14);
+
+restore;
+//breakpoint;
+SP = [PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1]*16 + 13];
+ireturn;

@@ -1,0 +1,173 @@
+//IP+2	<----SP
+//	Return Value
+//	Arg3
+//	Arg2(offset)
+//	Arg1(filename|FileDescriptor)
+//	sys call num
+//R15="int5";
+//print R15;
+
+alias userSP R0;
+alias syscall_num R1;
+alias filename R2;
+alias ret R3;
+userSP=SP;
+[PROCESS_TABLE + [SYSTEM_STATUS_TABLE+1]*16 + 13]=SP;
+SP=[PROCESS_TABLE + [SYSTEM_STATUS_TABLE+1]*16 + 11]*512-1;
+
+userSP=[PTBR + 2*(userSP/512)]*512 + userSP%512;
+syscall_num=[userSP-5];
+filename=[userSP-4];
+ret=userSP-1;
+[PROCESS_TABLE + [SYSTEM_STATUS_TABLE+1]*16 + 9]=syscall_num;
+//R15="sys#";
+//print R15;
+//print R1;
+//file open syscall
+if(syscall_num==2) then
+
+	alias pprt R15;
+	alias pprt_off R14;
+	pprt_off=0;
+	pprt=([PROCESS_TABLE + [SYSTEM_STATUS_TABLE+1]*16 + 11]+1)*512-16;
+	while(pprt_off<8) do
+		if([pprt + 2*pprt_off + 0]==-1) then
+		 	break;
+		endif;
+	pprt_off=pprt_off+1;
+	endwhile;
+	if(pprt_off<8) then
+		
+		//call open() file manager
+
+		multipush(R0,R1,R2,R3,R4,R15,R14);
+			R1=OPEN;
+			R2=filename;
+			call MOD_3;
+		//if(R0<0) then
+			//open failed
+			//[ret]=-2;
+		//endif;
+		R13=R0;
+		multipop(R0,R1,R2,R3,R4,R15,R14);
+		if(R13<0) then
+		//R13==-2	-->no free inode entry
+		//R13==-1	-->file entry not found, not data file, 
+			[ret]=R13;
+		else
+			alias file_drsp R5;
+			file_drsp=R13;
+			[pprt + 2*pprt_off + 0]=FILE;
+			[pprt + 2*pprt_off + 1]=file_drsp;	
+			[ret]=pprt_off;
+		endif;
+	else	
+		//return -3;
+		[ret]=-3;
+	endif;
+	
+endif;
+
+//file close syscall
+alias file_dcrs R2;
+if(syscall_num==3) then
+	if(file_dcrs>-1 && file_dcrs<8) then
+	alias pprt R14;
+        //alias pprt_off R13;
+        //pprt_off=0;
+        pprt=[PROCESS_TABLE + [SYSTEM_STATUS_TABLE+1]*16 + 11]*512 + RESOURCE_TABLE_OFFSET;
+       
+        	if([pprt + 2*file_dcrs + 0]==FILE) then
+                 	alias FileID R12;
+			FileID=[pprt + 2*file_dcrs + 1];
+			//call close from mod_3
+			multipush(R0,R1,R2,R3,R12,R13,R14);
+				R1=CLOSE;
+				R2=FileID;
+				call MOD_3;
+			multipop(R0,R1,R2,R3,R12,R13,R14);
+			[pprt+ 2*file_dcrs+1]=-1;
+			[pprt + 2*file_dcrs+0]=-1;
+			[ret]=0;
+		else
+			[ret]=-1;
+		endif;       
+      	
+	else
+		[ret]=-1;
+	endif;
+
+endif;
+//alias f_dscptr R2;
+//alias ret R3;
+//Seek sys call
+alias offset R4;
+offset=[userSP-3];
+if(syscall_num==6) then
+	//breakpoint;
+	if(file_dcrs>-1 && file_dcrs<8) then
+        alias pprt R14;
+        //alias pprt_off R13;
+        //pprt_off=0;
+        pprt=[PROCESS_TABLE + [SYSTEM_STATUS_TABLE+1]*16 + 11]*512 + RESOURCE_TABLE_OFFSET;
+
+                if([pprt + 2*file_dcrs + 0]==FILE) then
+                        alias FileID R13;
+                        FileID=[pprt + 2*file_dcrs + 1];
+			alias inode_off R12;
+			inode_off=[OPEN_FILE_TABLE + 4*FileID + 0];
+                        //call acquire_inode()
+               		multipush(R0,R1,R2,R3,R4,R12,R13,R14);
+                        	R1=ACQUIRE_INODE;
+                        	R3=inode_off;
+				R2=[SYSTEM_STATUS_TABLE + 1];
+                        	call MOD_0;
+				alias acq_ind_ret R15;
+                        	acq_ind_ret=R0;
+                	multipop(R0,R1,R2,R3,R4,R12,R13,R14);
+			if(acq_ind_ret==0) then
+				alias lseek R5;
+				lseek=[OPEN_FILE_TABLE + 4*FileID + 2];
+				if(lseek+offset<0) then
+					//release_inode()
+                                        multipush(R0,R1,R2,R3);
+                                                R1=RELEASE_INODE;
+                                                R3=inode_off;
+						R2=[SYSTEM_STATUS_TABLE +1];
+                                                call MOD_0;
+                                        multipop(R0,R1,R2,R3);
+					[ret]=-2;
+				else	
+					if(offset==0) then
+						[OPEN_FILE_TABLE + 4*FileID + 2]=0;
+					else 
+						if( (lseek+offset) >[INODE_TABLE + 16*inode_off + 2]) then
+							[OPEN_FILE_TABLE + 4*FileID + 2]=[INODE_TABLE + 16*inode_off + 2];
+						else
+							[OPEN_FILE_TABLE + 4*FileID + 2]=[OPEN_FILE_TABLE + 4*FileID + 2]+offset;
+						endif;
+					endif;
+					//release_inode()
+                                        multipush(R0,R1,R2,R3);
+                                                R1=RELEASE_INODE;
+                                                R3=inode_off;
+						R2=[SYSTEM_STATUS_TABLE+1];
+                                                call MOD_0;
+                                        multipop(R0,R1,R2,R3);
+                                        [ret]=0;
+
+				endif;
+			else
+                        	[ret]=-1;
+			endif;
+                else
+                        [ret]=-1;
+                endif;
+
+        else
+                [ret]=-1;
+        endif;
+endif;
+[PROCESS_TABLE + [SYSTEM_STATUS_TABLE+1]*16 + 9]=0;
+SP=[PROCESS_TABLE + [SYSTEM_STATUS_TABLE+1]*16 + 13];
+ireturn;

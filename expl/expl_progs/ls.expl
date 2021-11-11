@@ -1,0 +1,39 @@
+int main(){
+	decl
+	int temp, fdscptr, frRet, fsize, MaxFileNum, rootOFF,seekRET;
+	string filename;
+	enddecl
+	
+begin
+	MaxFileNum=60;
+	fdscptr=exposcall("Open","root");
+	temp=exposcall("Write",-2,"fdscptr");
+	temp=exposcall("Write",-2,fdscptr);	
+	if(fdscptr<0) then
+		temp=exposcall("Write",-2,"fail");
+	else
+		rootOFF=0;
+		while(rootOFF<MaxFileNum) do
+			frRet=exposcall("Read",fdscptr,filename);
+			if(frRet==0 AND filename != "-1") then
+				temp=exposcall("Write",-2,"Fname:");
+				temp=exposcall("Write",-2,filename);
+			endif;
+			frRet=exposcall("Read",fdscptr,fsize);
+                        if(frRet==0 AND filename != "-1") then
+                                temp=exposcall("Write",-2,"Fsize:");
+                                temp=exposcall("Write",-2,fsize);
+                        endif;
+			temp=exposcall("Write",-2,"	");
+			seekRET=exposcall("Seek",fdscptr,6);
+			temp=exposcall("Write",-2,"seek_ret");
+			temp=exposcall("Write",-2,seekRET);
+		rootOFF=rootOFF+rootOFF;
+		endwhile;
+		temp=exposcall("Close",fdscptr);
+	endif;
+	
+	
+return 0;
+end
+}

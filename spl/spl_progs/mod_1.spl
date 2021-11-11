@@ -1,0 +1,208 @@
+//R15="mod1";
+//print R15;
+//R15="f#";
+//print R15;
+//print R1;
+//note here f#4 and f#2 are swapped ie free_usr_pg(2) && free_pgt(4)
+
+//R2 PID
+//R1 f#
+//R0
+alias f_num R1;
+alias PID R2;
+
+//free_usr_pg
+if(f_num == 4) then
+	alias pp_rs_tb R3;
+	pp_rs_tb=([PROCESS_TABLE + PID*16 + 11]+1)*512-16;
+	alias semid R14;
+	semid=0;
+	while(semid<8) do
+		multipush(R2,R3,R14);
+		alias pp_rs_entry R13;
+		pp_rs_entry=pp_rs_tb + 2*semid;
+		if([pp_rs_entry]==SEMAPHORE) then
+			R1=7;
+			R3=[pp_rs_entry +1];
+			call MOD_0;
+			endif;
+		if([pp_rs_entry]==FILE) then
+                        R1=CLOSE;
+                        R3=[pp_rs_entry +1];
+                        call MOD_3;
+                endif;
+		multipop(R2,R3,R14);
+
+		semid=semid+1;
+	endwhile;
+	//u_ar_PG = [PROCESS_TABLE + PID* 16 + 11];
+	multipush(R2);
+	R1=2;
+	R2=[PROCESS_TABLE + PID* 16 + 11];
+	call MOD_2;
+	multipop(R2);
+	alias dsk_map_entry R5;
+	dsk_map_entry=DISK_MAP_TABLE + PID*10;
+	if([dsk_map_entry + 2]!=-1) then 
+		multipush(R5);
+		R1=4;
+		R2=[dsk_map_entry  + 2];
+		call MOD_2;
+		multipop(R5);
+	endif;
+	if([dsk_map_entry  + 3]!=-1) then
+		multipush(R5);
+                R1=4;
+                R2=[dsk_map_entry + 3];
+                call MOD_2;
+                multipop(R5);
+        endif;
+	if([dsk_map_entry + 8]!=-1) then
+       		multipush(R5);
+                R1=4;
+                R2=[dsk_map_entry + 8];
+                call MOD_2;
+                multipop(R5);
+	 endif;
+	if([dsk_map_entry  + 9]!=-1) then
+        	multipush(R5);
+                R1=4;
+                R2=[dsk_map_entry + 9];
+                call MOD_2;
+                multipop(R5);
+	endif;
+	alias disk_off R14;
+	disk_off=2;
+	while(disk_off<10) do
+		[dsk_map_entry + disk_off]=-1;
+	disk_off=disk_off+1;
+	endwhile;
+	return;
+endif;
+//exit process
+if(f_num == 3) then
+	if([PROCESS_TABLE +[SYSTEM_STATUS_TABLE+1]*16 + 9]!=9) then
+		alias pt_off R14;
+		pt_off=1;
+		while(pt_off<16) do
+			if([PROCESS_TABLE + pt_off*16 + 4]==WAIT_PROCESS && [PROCESS_TABLE + pt_off*16 + 5]==PID) then
+				[PROCESS_TABLE + pt_off*16 + 4]=READY;
+			endif;
+			if([PROCESS_TABLE + pt_off*16 + 2]==[SYSTEM_STATUS_TABLE+1]) then
+				[PROCESS_TABLE + pt_off*16 + 2]=-1;
+			endif;
+		pt_off=pt_off+1;
+		endwhile;
+	endif;  
+	multipush(R2);
+	R1=2;
+	R2=PID;
+	call MOD_1;
+	multipop(R2);
+	multipush(R2);
+	R1=4;
+	R2=PID;
+	call MOD_1;
+	multipop(R2);
+	[PROCESS_TABLE + PID*16 + 4] = TERMINATED;
+	return;
+endif;
+//free_pg_tb
+if(f_num == 2) then
+	
+
+	[PTBR+0] = -1;
+	[PTBR+1] = "0000";
+	[PTBR+2] = -1;
+	[PTBR+3] = "0000";
+	alias pg_off R15;
+	pg_off=4;
+	while(pg_off <20 ) do
+		if([PTBR + pg_off]!=-1) then
+			multipush(R15);
+			R1=2;
+			R2=[PTBR+pg_off];
+			call MOD_2;
+			multipop(R15);
+			[PTBR+pg_off]=-1;
+			[PTBR+pg_off+1]="0000";
+			
+		endif;
+	pg_off=pg_off+2;
+	endwhile;
+	return;
+endif;
+//get pcb entry
+if(f_num == 1) then
+	alias PID R14;
+	PID=1;
+	while(PID < 16 && [PROCESS_TABLE + PID*16 + 4]!=TERMINATED) do
+	
+	PID=PID+1;
+	endwhile;
+	if(PID < 16 && [PROCESS_TABLE + PID*16 + 4]==TERMINATED) then
+		R0=PID;
+		alias pt_entry R13;
+		pt_entry=PROCESS_TABLE + PID*16;
+		[pt_entry + 1]=PID;
+		[pt_entry + 4]=ALLOCATED;
+		[pt_entry + 14]=PAGE_TABLE_BASE + PID*20;
+		[pt_entry + 15]=10;
+	else
+		R0=-1;
+	endif;
+	return;
+endif;
+//return nil
+//R2 curr_pid
+//R1 f_num
+//kill all
+if(f_num==KILL_ALL) then
+
+	alias currPID R2;
+        alias inode_off R14;
+        inode_off=0;
+        while(inode_off<MAX_FILE_NUM) do
+		//[INODE_TABLE + 16*inode_off + 0]==DATA, locking all files
+                if( [INODE_TABLE + 16*inode_off + 1]!=-1) then
+                        //call acquire_inode()
+                multipush(R2,R14);
+                        R1=ACQUIRE_INODE;
+                        R2=[SYSTEM_STATUS_TABLE+1];
+                        R3=inode_off;
+                        call MOD_0;
+                multipop(R2,R14);
+
+                endif;
+        inode_off=inode_off+1;
+        endwhile;
+
+	alias pt_off R13;
+	pt_off=2;
+	while(pt_off<MAX_PROC_NUM) do
+		if(pt_off!=currPID && [PROCESS_TABLE + 16*pt_off + 4]!=TERMINATED) then
+			//note that not only inode,disk,terminal buffer
+			multipush(R2,R13,R14);
+				R1=EXIT_PROCESS;
+				R2=pt_off;
+				call MOD_1;
+			multipop(R2,R13,R14);
+		endif;
+	pt_off=pt_off+1;
+	endwhile;
+	inode_off=0;
+        while(inode_off<MAX_FILE_NUM) do
+                //[INODE_TABLE + 16*inode_off + 0]==DATA, locking all files
+                if( [INODE_TABLE + 16*inode_off + 1]!=-1) then
+                //release inode()
+                	multipush(R14);
+                        	R1=RELEASE_INODE;
+                        	R2=[SYSTEM_STATUS_TABLE+1];
+                        	R3=inode_off;
+                        	call MOD_0;
+                        multipop(R14);               
+		 endif;
+        inode_off=inode_off+1;
+        endwhile;
+	return;
+endif;

@@ -1,0 +1,190 @@
+//R15="mod3";
+//print R15;
+//R15="f#";
+//print R15;
+//print R1;
+
+//R2 
+//R1
+//R0
+
+alias f_num R1;
+alias ret R0;
+
+//file open
+if(f_num==OPEN) then
+	alias filename R2;
+	alias inode_off R14;
+	inode_off=0;
+	while(inode_off<MAX_FILE_NUM) do
+		if([INODE_TABLE + 16*inode_off + 1]==filename) then
+			break;
+		endif;
+	inode_off=inode_off+1;
+	endwhile;
+	if(inode_off<MAX_FILE_NUM) then
+		//call acquire_inode()
+		multipush(R1,R2,R14);
+			R1=ACQUIRE_INODE;
+			R2=[SYSTEM_STATUS_TABLE+1];
+			R3=inode_off;
+			call MOD_0;
+			R15=R0;			
+		multipop(R1,R2,R14);
+		
+		if(R15==0) then //if locking happen
+			if([INODE_TABLE +16*inode_off + 0]==DATA || [INODE_TABLE +16*inode_off + 0]==ROOT ) then
+				alias oft_off R13;
+				oft_off=0;
+				while(oft_off<MAX_OPENFILE_NUM) do
+					if([OPEN_FILE_TABLE + 4*oft_off + 0]==-1) then
+						break;
+					endif;
+				oft_off=oft_off+1;
+				endwhile;
+
+				if(oft_off<MAX_OPENFILE_NUM && [OPEN_FILE_TABLE + 4*oft_off + 0]==-1) then
+					if([INODE_TABLE + 16*inode_off + 1]=="root") then
+						[OPEN_FILE_TABLE + 4*oft_off + 0]=INODE_ROOT;
+					else 
+						if([FILE_STATUS_TABLE + 4*inode_off + 1]==-1) then
+							[FILE_STATUS_TABLE + 4*inode_off + 1]=1;
+						else 
+								[FILE_STATUS_TABLE + 4*inode_off + 1]=[FILE_STATUS_TABLE + 4*inode_off + 1]+1;
+						endif;
+						[OPEN_FILE_TABLE + 4*oft_off + 0]=inode_off;
+					endif;
+					[OPEN_FILE_TABLE +4*oft_off + 1]=1;
+					[OPEN_FILE_TABLE +4*oft_off + 2]=0;
+					//release_inode()
+					multipush(R13);
+						R1=RELEASE_INODE;
+						R2=[SYSTEM_STATUS_TABLE+1];
+						R3=inode_off;
+						call MOD_0;
+					multipop(R13);
+					R0=oft_off;
+				else
+					//release inode()
+					//multipush(R0,R1,R2,R3,R13,R14);
+                                                R1=RELEASE_INODE;
+                                                R2=[SYSTEM_STATUS_TABLE+1];
+                                                R3=inode_off;
+                                                call MOD_0;
+                                        //multipop(R0,R1,R2,R3,R13,R14);
+
+					R0=-2;
+				endif;
+			else
+				//call release inode
+				//multipush(R0,R1,R2,R3,R13,R14);
+                                                R1=RELEASE_INODE;
+                                                R2=[SYSTEM_STATUS_TABLE+1];
+                                                R3=inode_off;
+                                                call MOD_0;
+                                //multipop(R0,R1,R2,R3,R13,R14);
+	
+				R0=-1;
+			endif;
+		else
+			//if locking doesn't happen
+			R0=-1;
+		endif;
+	else
+		R0=-1;
+	endif;
+	return;
+endif;
+	
+//close
+if(f_num==CLOSE) then
+	alias FT_ID R2;
+	alias inode_off R14;
+	inode_off=[OPEN_FILE_TABLE + 4*FT_ID + 0];
+	[OPEN_FILE_TABLE + 4*FT_ID +1]=[OPEN_FILE_TABLE + 4*FT_ID +1]-1;
+	
+	if([OPEN_FILE_TABLE + 4*FT_ID +1]==0 ) then
+		[OPEN_FILE_TABLE + 4*FT_ID +0]=-1;
+		[OPEN_FILE_TABLE + 4*FT_ID +1]=-1;
+		[OPEN_FILE_TABLE + 4*FT_ID +2]=-1;
+		if([INODE_TABLE + 16*inode_off + 1]!="root") then
+			[FILE_STATUS_TABLE + 4*inode_off + 1]=[FILE_STATUS_TABLE + 4*inode_off + 1]-1;
+			if([FILE_STATUS_TABLE + 4*inode_off + 1]==0) then
+				[FILE_STATUS_TABLE +4*inode_off + 1]=-1;
+			endif;
+		
+		endif;
+		[OPEN_FILE_TABLE + 4*FT_ID + 0]=-1;
+	endif;
+	return;		
+endif;
+
+
+//R4	phy_mem_add or word
+//R3	offset
+//R2	disk block no
+//R0	ret
+//buffered read/write
+if(f_num==BUFFERED_READ || f_num==BUFFERED_WRITE) then
+	//R15="bufing";
+	//print R15;
+	alias dsk_blk_no R2;
+	alias offset R3;
+	alias phy_mem_add_word R4;
+	alias buff_no R14;
+	buff_no=dsk_blk_no%4;
+	//call acquire buffer
+	multipush(R1,R2,R3,R4,R14);
+		R1=ACQUIRE_BUFFER;
+		R2=[SYSTEM_STATUS_TABLE+1];
+		R3=buff_no;
+		call MOD_0;
+	multipop(R1,R2,R3,R4,R14);
+	if([BUFFER_TABLE + 4*buff_no + 0]!=dsk_blk_no) then
+		if([BUFFER_TABLE + 4*buff_no + 1]==1) then
+			//call disk_store
+			//BUFFER_BASE=71,BUFFER is 71*512
+			multipush(R1,R2,R3,R4,R14);
+				R1=DISK_STORE;
+				R2=[SYSTEM_STATUS_TABLE +1];
+				R3=BUFFER_BASE+buff_no;
+				R4=[BUFFER_TABLE + 4*buff_no + 0];
+				call MOD_4;
+			multipop(R1,R2,R3,R4,R14);
+			[BUFFER_TABLE + 4*buff_no + 1]=0;
+		endif;
+		
+		//call disk load
+		multipush(R1,R2,R3,R4,R14);
+			R1=DISK_LOAD;
+			R4=dsk_blk_no;
+			R2=[SYSTEM_STATUS_TABLE+1];
+			R3=BUFFER_BASE+buff_no;
+			call MOD_4;
+		multipop(R1,R2,R3,R4,R14);
+		[BUFFER_TABLE + 4*buff_no + 0]=dsk_blk_no;
+	endif;
+	if(f_num==BUFFERED_READ) then
+		//phy_mem_add
+		[phy_mem_add_word]=[BUFFER + buff_no*512 + offset];	
+	endif;
+	//breakpoint;
+	if(f_num==BUFFERED_WRITE) then
+		//word
+		//R15="buff_w";
+		//print R15;
+		[BUFFER + buff_no*512 + offset]=phy_mem_add_word;	
+		//print [BUFFER + buff_no*512 + offset];
+		[BUFFER_TABLE + buff_no*4 + 1]=1;
+	endif;
+	//call release buffer
+	//multipush(R0,R1,R2,R3,R4,R14);
+		R1=RELEASE_BUFFER;
+		R2=[SYSTEM_STATUS_TABLE+1];
+		R3=buff_no;
+		call MOD_0;
+	//multipop(R0,R1,R2,R3,R4,R14);
+	return;
+endif;
+
+

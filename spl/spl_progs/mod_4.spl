@@ -1,0 +1,109 @@
+//R4 arg4
+//R3 arg3
+//R2 arg2
+//R1 arg1
+//R0 return
+//R15="mod4";
+//print R15;
+//R15="f#";
+//print R15;
+//print R1;
+alias f_num R1;
+alias currPID R2;
+alias lg_addr R3;
+alias phy_addr R4;
+if(f_num == 3) then
+	multipush(R0,R1,R2,R3);
+	alias new_f_num R1;
+	new_f_num = 8;
+	//call to acquire terminal
+	call MOD_0;
+	//R0 ignored 
+	multipop(R0,R1,R2,R3);
+	print R3;
+	multipush(R0,R1,R2,R3);
+	new_f_num = 9;
+	//call to release terminal
+	call MOD_0;
+	//R0 not sure to be ignored
+	alias ret R15;
+	ret = R0; 
+        multipop(R0,R1,R2,R3);
+	return;
+endif;
+
+if(f_num == 4)then
+	multipush(R0,R1,R2,R3,R4);
+        alias new_f_num R1;
+        new_f_num = 8;
+        //call to acquire terminal
+	R2=[SYSTEM_STATUS_TABLE + 1];        
+	call MOD_0;
+        //R0 ignored 
+        multipop(R0,R1,R2,R3,R4);
+	read;
+	[PROCESS_TABLE + [SYSTEM_STATUS_TABLE+1]*16 + 4] = WAIT_TERMINAL;
+	multipush(R0,R1,R2,R3,R4);
+	// call scheduler
+	call MOD_5;
+	multipop(R0,R1,R2,R3,R4);
+	currPID = [SYSTEM_STATUS_TABLE + 1];
+	phy_addr = [ PTBR + 2*(lg_addr/512) ] * 512 + lg_addr%512;
+	[phy_addr] = [PROCESS_TABLE + currPID*16 + 8];
+	return;
+endif;
+
+//disk load
+//R4 block_no
+//R3 pg_no
+//R2 PID
+//R1 f_num
+//R0 return
+alias ret R0;
+alias pg_no R3;
+alias block_no R4;
+if(f_num == 2) then
+	//R15="dsk_ld";
+	//print R15;
+	//breakpoint;
+	multipush(R0,R1,R2,R3,R4);
+	//call acqiure disk
+	R1=3;
+	call MOD_0;
+	multipop(R0,R1,R2,R3,R4);
+	[DISK_STATUS_TABLE + 1]=0;
+	[DISK_STATUS_TABLE + 2]=pg_no;
+	[DISK_STATUS_TABLE + 3]=block_no;
+	load(pg_no,block_no);
+	[PROCESS_TABLE + currPID*16 + 4] = WAIT_DISK;
+	multipush(R0,R1,R2,R3,R4);
+	call MOD_5;
+	multipop(R0,R1,R2,R3,R4);
+	return;
+endif;
+
+//disk store
+//R4 block_no
+//R3 pg_no
+//R2 PID
+//R1 f_num
+//R0 return
+if(f_num==1) then
+	//R15="dsk_str";
+	//print R15;
+	//call acquire disk
+	multipush(R0,R1,R2,R3,R4);
+		R1=3;	
+		R2=[SYSTEM_STATUS_TABLE+1];
+		call MOD_0;
+	multipop(R0,R1,R2,R3,R4);
+	[DISK_STATUS_TABLE + 1]=1;
+        [DISK_STATUS_TABLE + 2]=pg_no;
+        [DISK_STATUS_TABLE + 3]=block_no;
+        store(pg_no,block_no);
+        [PROCESS_TABLE + currPID*16 + 4] = WAIT_DISK;
+        multipush(R0,R1,R2,R3,R4);
+        call MOD_5;
+        multipop(R0,R1,R2,R3,R4);
+	return;
+endif;

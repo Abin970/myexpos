@@ -1,0 +1,77 @@
+[PROCESS_TABLE + [SYSTEM_STATUS_TABLE+1]*16 + 9]=-1;
+[PROCESS_TABLE + [SYSTEM_STATUS_TABLE+1]*16 + 13]=SP;
+SP=[PROCESS_TABLE + [SYSTEM_STATUS_TABLE+1]*16 +11]*512-1;
+backup;
+multipush(EIP);
+alias userSP R0;
+userSP=[PROCESS_TABLE + [SYSTEM_STATUS_TABLE+1]*16 + 13];
+R15="exPID";
+print R15;
+print [SYSTEM_STATUS_TABLE + 1];
+breakpoint;
+
+if( (EC != 0) || (userSP==PTLR*512-1) ) then
+	if(EC==1) then
+	R15="Instruction";
+	endif;
+	if(EC==2) then
+	R15="Memory";
+	endif;
+	if(EC==3) then
+	R15="Arithmetic";
+	endif;
+	print R15;
+	multipush(R0,R1,R2);
+	R1=3;
+	R2=[SYSTEM_STATUS_TABLE+1];
+	call MOD_1;
+	multipop(R0,R1,R2);
+	[PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1]*16 + 4]=TERMINATED;
+	call MOD_5;
+endif;
+alias code_block R1;
+if(EPN > 3 && EPN < 8) then
+	code_block=[DISK_MAP_TABLE + [SYSTEM_STATUS_TABLE+1]*10 + EPN];
+	//R15="cd_pg";
+	//print R15;
+	//print R1;
+	//print EPN;
+	if(code_block!=-1) then
+		multipush(R0,R1,R2,R3);
+		R2=R1;
+		R1=5;
+		call MOD_2;
+		[PTBR +2*EPN ]=R0;
+		multipop(R0,R1,R2,R3);	
+		[PTBR +2*EPN +1]="1100";
+	endif;
+endif;
+
+if(EPN > 1 && EPN  < 4) then
+	//R15="heap";
+	//print R15;
+        multipush(R0,R1,R2,R3);
+        R1=1;
+        call MOD_2;
+	//print R0;
+        [PTBR +4]=R0;
+        [PTBR +5]="1110";
+        multipop(R0,R1,R2,R3);
+	multipush(R0,R1,R2,R3);
+        R1=1;
+        call MOD_2;
+	//print R0;
+        [PTBR +6 ]=R0;
+        [PTBR +7]="1110";
+        multipop(R0,R1,R2,R3);
+endif;
+multipop(EIP);
+[PROCESS_TABLE + [SYSTEM_STATUS_TABLE+1]*16 + 9]=0;
+restore;
+SP=[PROCESS_TABLE + [SYSTEM_STATUS_TABLE+1]*16 + 13];
+if(EC==0) then
+SP=SP+1;
+//breakpoint;
+[ [ [PROCESS_TABLE + [SYSTEM_STATUS_TABLE+1]*16 + 14] + 2*(SP/512)]*512 + (SP%512)]=EIP;
+endif;
+ireturn;

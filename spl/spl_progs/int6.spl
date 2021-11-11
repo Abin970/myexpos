@@ -1,0 +1,154 @@
+
+//R15="int6";
+//print R15;
+//breakpoint;
+//mode flag set to 7 for read sys call
+[PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1]*16 + 9] = 7;
+//R15="lg_uSP";
+//print R15;
+//print SP;
+alias userSP R0;
+userSP = SP;
+userSP=[PTBR + 2*(userSP/512)]*512 + userSP%512;
+///R15="phy_uSP";
+//print R15;
+//print R0;
+[PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1]*16 + 13] = SP;
+
+SP = [PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1]*16 + 11]*512 - 1;
+
+//IP+2
+//ret space
+//arg3
+//arg2(lg_add_buf)
+//arg1(file_dptr)
+//sys call
+
+alias file_dptr R1;
+alias ret R3;
+alias lg_add_buff R2;
+file_dptr = userSP-4;
+lg_add_buff=userSP-3;
+lg_add_buff=[lg_add_buff];
+ret=userSP-1;
+//file_dptr = [ [PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1]*16 + 14] + 2*(file_dptr/512) ]*512 + (file_dptr%512);
+
+file_dptr = [file_dptr];
+//R15="f_dptr";
+//print R15;
+//print R1;
+if(file_dptr == -1) then
+	multipush(R0,R1,R2,R3);
+	R3 = lg_add_buff;
+	R1 = 4;
+	R2 = [SYSTEM_STATUS_TABLE + 1];
+ 	call MOD_4;
+	multipop(R0,R1,R2,R3);
+        [ret] = 0;
+
+else
+	if(file_dptr>-1 && file_dptr<8) then
+		alias pprt R14;
+		pprt=[PROCESS_TABLE + [SYSTEM_STATUS_TABLE+1]*16 + 11]*512+RESOURCE_TABLE_OFFSET;
+		if([pprt + 2*file_dptr + 0]==FILE) then
+			alias oft_index R13;
+			oft_index=[pprt + 2*file_dptr + 1];
+			alias inode_off R12;
+			inode_off=[OPEN_FILE_TABLE + 4*oft_index + 0];
+			//call acquire_inode()
+			multipush(R0,R1,R2,R3,R12,R13,R14);
+				R1=ACQUIRE_INODE;
+				R2=[SYSTEM_STATUS_TABLE+1];
+				R3=inode_off;
+				call MOD_0;
+				//R15="acq_ret";
+				//print R15;
+				//print R0;
+				R15=R0;
+			multipop(R0,R1,R2,R3,R12,R13,R14);
+			
+			if(R15==0) then
+				alias lseek R11;
+				lseek=[OPEN_FILE_TABLE + 4*oft_index + 2];
+				alias phy_add_buff R10;
+				phy_add_buff=[PTBR + 2*(lg_add_buff/512)]*512 + lg_add_buff%512;
+				//R15="phy_add";
+				//print R15;
+				//print R10;
+				if([INODE_TABLE + 16*inode_off + 1]=="root")  then
+
+					if(lseek!=480) then
+						[phy_add_buff]=[ROOT_FILE + lseek];
+						[OPEN_FILE_TABLE + 4*oft_index + 2]=[OPEN_FILE_TABLE + 4*oft_index + 2]+1;						
+					else
+						//release_inode()
+						multipush(R0,R1,R2,R3,R4);
+							R1=RELEASE_INODE;
+							R2=[SYSTEM_STATUS_TABLE+1];
+							R3=inode_off;
+							call MOD_0;
+						multipop(R0,R1,R2,R3,R4);
+						[ret]=-2;
+					endif;
+				else 
+					if(lseek!=[INODE_TABLE + 16*inode_off + 2]) then
+						alias block R9;
+						//block=lseek/512;
+						//0,1,2,3
+						//block=[INODE_TABLE + 16*inode_off + (8+lseek/512)]*512 + lseek%512;
+						multipush(R0,R1,R2,R3,R4,R12,R13,R14);
+							R1=BUFFERED_READ;
+							R2=[INODE_TABLE + 16*inode_off + (8+lseek/512)];
+							R3=lseek%512;
+							R4=phy_add_buff;
+							call MOD_3;
+						multipop(R0,R1,R2,R3,R4,R12,R13,R14);
+							[OPEN_FILE_TABLE + 4*oft_index + 2]=[OPEN_FILE_TABLE + 4*oft_index + 2]+1;
+						multipush(R0,R1,R2,R3,R4,R12,R13);
+                                                        R1=RELEASE_INODE;
+                                                        R2=[SYSTEM_STATUS_TABLE+1];
+                                                        R3=inode_off;
+                                                        call MOD_0;
+                                                multipop(R0,R1,R2,R3,R4,R12,R13);
+                                                [ret]=0;
+						//R15="retval";
+						//print R15;
+						//print R3;
+						//print [R3];
+						
+					else
+						//R15="lsK_full";
+						//print R15;
+						multipush(R0,R1,R2,R3,R4);
+							R1=RELEASE_INODE;
+							R2=[SYSTEM_STATUS_TABLE+1];																	R3=inode_off;
+							call MOD_0;
+						multipop(R0,R1,R2,R3,R4);
+						[ret]=-2;
+
+					endif;
+
+				endif;
+
+			else
+				
+				//acquire_inode() failed
+				[ret]=-1;
+			endif;
+		else
+			[ret]=-1;
+		endif;
+
+	else
+		[ret]=-1;
+	endif; 
+	
+	//ret = userSP-1;
+	//ret=[PTBR+2*(ret/512)]*512+(ret%512);
+	//[ret] = -1;
+endif;
+
+[PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1]*16 + 9] = 0;
+SP = [PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1]*16 + 13];
+//breakpoint;
+ireturn;

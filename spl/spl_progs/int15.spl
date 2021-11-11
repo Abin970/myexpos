@@ -1,0 +1,91 @@
+//IP+2
+//ret
+//arg3
+//arg2
+//arg1
+//sys_call num
+
+R15="int15";
+print R15;
+//mode flag
+[PROCESS_TABLE + ( [SYSTEM_STATUS_TABLE + 1]* 16) + 9] = 15;
+alias phy_userSP R0;
+phy_userSP=SP;
+phy_userSP=[PTBR + 2*(phy_userSP/512)]*512+(phy_userSP%512);
+alias ret R1;
+ret=phy_userSP-1;
+//save SP to Uptr
+[PROCESS_TABLE + ( [SYSTEM_STATUS_TABLE + 1]* 16) + 13] = SP;
+//Setting SP to UArea Page number*512-1
+SP = [PROCESS_TABLE +([SYSTEM_STATUS_TABLE + 1] * 16) + 11] * 512 -1 ;
+
+
+if([SYSTEM_STATUS_TABLE +1]!=1 || [PROCESS_TABLE + [SYSTEM_STATUS_TABLE+1]*16 +3]!=1) then
+	[ret]=-1;
+	[PROCESS_TABLE + ( [SYSTEM_STATUS_TABLE + 1]* 16) + 9]=0;
+	SP=[PROCESS_TABLE + ( [SYSTEM_STATUS_TABLE + 1]* 16) + 13];
+	ireturn;
+endif;
+
+	multipush(R0,R1,R2,R3);
+                R1=KILL_ALL;
+                R2=[SYSTEM_STATUS_TABLE +1];
+                call MOD_1;
+        multipop(R0,R1,R2,R3);
+
+	alias buff_off R14;
+	buff_off=0;
+	while(buff_off<MAX_BUFFER) do
+		if([BUFFER_TABLE + 4*buff_off + 1]==1) then
+			multipush(R0,R1,R2,R3,R14);
+				R1=DISK_STORE;
+				R2=[SYSTEM_STATUS_TABLE+1];
+				R3=BUFFER_BASE+buff_off;
+				R4=[BUFFER_TABLE + 4*buff_off  + 0];
+				call MOD_4;
+			multipop(R0,R1,R2,R3,R14);
+		endif;
+	buff_off=buff_off+1;
+	endwhile;
+	//call Disk store for 59(3), 60(4), 61(2), 62(5)
+	multipush(R0,R1,R2,R3);
+		R1=1;
+		R2=[SYSTEM_STATUS_TABLE + 1];
+		R3=59;
+		R4=3;
+		call MOD_4;
+	multipop(R0,R1,R2,R3);
+	multipush(R0,R1,R2,R3);
+                R1=1;
+                R2=[SYSTEM_STATUS_TABLE + 1];
+                R3=60;
+                R4=4;
+                call MOD_4;
+        multipop(R0,R1,R2,R3);
+	multipush(R0,R1,R2,R3);
+                R1=1;
+                R2=[SYSTEM_STATUS_TABLE + 1];
+                R3=61;
+                R4=2;
+                call MOD_4;
+        multipop(R0,R1,R2,R3);
+	multipush(R0,R1,R2,R3);
+                R1=1;
+                R2=[SYSTEM_STATUS_TABLE + 1];
+                R3=62;
+                R4=5;
+                call MOD_4;
+        multipop(R0,R1,R2,R3);
+	
+
+R15="max-mem";
+print R15;
+print [82*512-1];
+R15="max-switch";
+print R15;
+print [82*512-2];
+R15="dsk-accs";
+print R15;
+print [82*512-3];
+
+halt;

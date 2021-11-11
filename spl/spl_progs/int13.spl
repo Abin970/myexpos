@@ -1,0 +1,95 @@
+//      IP+2    <----SP
+//      Return Value
+//      Arg3
+//      Arg2
+//      Arg1
+//      sys call num
+//R15="int13";
+//print R15;
+
+alias userSP R0;
+alias syscall_num R1;
+alias ret R4;
+userSP=SP;
+
+
+
+[PROCESS_TABLE + [SYSTEM_STATUS_TABLE+1]*16 + 13]=SP;
+
+SP=[PROCESS_TABLE + [SYSTEM_STATUS_TABLE+1]*16 + 11]*512-1;
+
+ret=[PTBR + 2*((userSP-1)/512)]*512 + (userSP-1)%512;
+syscall_num=[PTBR + 2*((userSP-5)/512)]*512 + (userSP-5)%512;
+syscall_num=[syscall_num];
+[PROCESS_TABLE + [SYSTEM_STATUS_TABLE+1]*16 +9]=syscall_num;
+//R15="sys#";
+//print R15;
+//print R1;
+//Semget
+if(syscall_num==17) then
+	alias pp_rs_tb R2;
+	pp_rs_tb=([PROCESS_TABLE + [SYSTEM_STATUS_TABLE+1]*16 + 11]+1)*512-16;
+	alias rs_idx R14;
+	rs_idx=0;
+	while(rs_idx<8 && [pp_rs_tb + 2*rs_idx]!=-1) do
+	rs_idx=rs_idx+2;
+	endwhile;
+	if(rs_idx<8 && [pp_rs_tb + 2*rs_idx]==-1) then
+		//R15="rs_idx";
+		//print R15;
+		//print R14;
+		[pp_rs_tb + 2*rs_idx]=SEMAPHORE;
+		//call Acquire Semaphore
+		multipush(R0,R1,R2,R4,R14);
+		R1=6;
+		R2=[SYSTEM_STATUS_TABLE+1];
+		call MOD_0;
+		//if no free semaphore then return -2
+		if(R0!=-1) then
+			[[SP-2] + 2*[SP]+1]=R0;
+			[ret]=[SP];
+
+		else 
+			[ret]=-2;		
+		endif;
+		multipop(R0,R1,R2,R4,R14);	
+	else
+		[ret]=-1;
+	endif;
+	//breakpoint;	
+endif;
+
+//Semrelease
+if(syscall_num==18) then
+	alias semid R2;
+	//index of per-process resource table
+	semid=[PTBR + 2*((userSP-4)/512)]*512 + (userSP-4)%512;
+	semid=[semid];
+	//R15="semid";
+	//print R15;
+	//print R2;
+	alias pp_rs_tb R3;
+	pp_rs_tb=([PROCESS_TABLE + [SYSTEM_STATUS_TABLE+1]*16 + 11]+1)*512-16;
+	//print [pp_rs_tb];
+	//breakpoint;
+	if(semid<8 && semid>-1 && [ pp_rs_tb + 2*semid]==SEMAPHORE) then
+		multipush(R0,R1,R2,R3,R4);
+		//call release semaphore
+		//breakpoint;
+		R1=7;
+		R2=[SYSTEM_STATUS_TABLE+1];
+		R3=[pp_rs_tb + 2*semid +1];
+		call MOD_0;
+		multipop(R0,R1,R2,R3,R4);
+		//invalidating i/p
+		[pp_rs_tb + 2*semid]=-1;
+		[ret]=0;
+	else
+		[ret]=-1;
+	endif;
+	//breakpoint;
+endif;
+
+[PROCESS_TABLE + [SYSTEM_STATUS_TABLE+1]*16 +9]=0;
+SP=[PROCESS_TABLE + [SYSTEM_STATUS_TABLE+1]*16 + 13];
+ireturn;

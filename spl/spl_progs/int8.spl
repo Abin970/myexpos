@@ -1,0 +1,188 @@
+//IP+2	<---SP
+//return value
+//Arg3
+//Arg2
+//Arg1
+//sys call num
+//R15="int8";
+//print R15;
+
+[PROCESS_TABLE+[SYSTEM_STATUS_TABLE+1]*16+ 9]=8;
+alias pr_userSP R0;
+pr_userSP=SP;
+[PROCESS_TABLE+[SYSTEM_STATUS_TABLE+1]*16+13]=SP;
+SP=[PROCESS_TABLE+[SYSTEM_STATUS_TABLE+1]*16+ 11]*512-1;
+//invoke pcb entry
+alias childPID R3;
+multipush(R0);
+R1=1;
+call MOD_1;
+childPID=R0;
+multipop(R0);
+pr_userSP=[PTBR + 2*(pr_userSP/512)]*512 + pr_userSP%512;
+if(childPID==-1) then 
+	//return -1 in stack;
+        //alias prnt_usrSP R13;
+        //prnt_usrSP=[ PTBR + 2*((pr_userSP-1)/512)]*512 + (pr_userSP-1)%512;
+        [pr_userSP-1]=-1;
+	
+else 
+	//page table for chilld and parent are diff
+	//if heap page not alloc, here is parent's PTBR
+	if([PTBR+4]==-1 && [PTBR+6]==-1) then
+	multipush(R0,R2,R3);
+	R1=1;
+	call MOD_2;
+	[PTBR+4]=R0;
+	[PTBR+5]="0110";
+	R1=1;
+	call MOD_2;
+	[PTBR+6]=R0;
+	[PTBR+7]="0110";
+	multipop(R0,R2,R3);
+	endif;
+
+
+	//2 stack page
+	alias childPTBR R14;
+	childPTBR=[PROCESS_TABLE + childPID*16 + 14];
+	multipush(R0,R3,R14);
+	R1=1;
+	call MOD_2;
+	//childPTBR=[SP]
+	[[SP]+16]=R0;
+	R1=1;
+	call MOD_2;
+	[[SP]+18]=R0;
+	[[SP]+17]="0110";
+	[[SP]+19]="0110";
+	multipop(R0,R3,R14);
+
+	//usr page
+	
+	multipush(R0,R2,R3);
+	R1=1;
+	call MOD_2;
+	//childPID=[SP]
+	[PROCESS_TABLE + [SP]*16 + 11]=R0;
+	multipop(R0,R2,R3);
+	alias child_prtb R14;
+	alias prnt_prtb R13;
+	//alias child_ptb_entry R12;
+	//alias prnt_ptb_entry R11;
+	child_prtb=PROCESS_TABLE + childPID*16;
+	prnt_prtb=PROCESS_TABLE + [SYSTEM_STATUS_TABLE+1]*16;
+	[child_prtb + 3]=[prnt_prtb + 3];
+	[child_prtb + 6]=[prnt_prtb + 6];
+	[child_prtb + 10]=[prnt_prtb + 10];
+	[child_prtb + 7]=[prnt_prtb + 7];
+	[child_prtb + 13]=[prnt_prtb + 13];	
+	[child_prtb + 0]=0;
+	[child_prtb + 9]=0;
+	[child_prtb + 12]=0;
+	//ppid
+	[child_prtb + 2]=[SYSTEM_STATUS_TABLE+1];
+	[child_prtb + 4]=CREATED;
+	//PID, PTBR, PTLR init in Get Pcb Entry
+	//no need to init  i/p buffer
+	
+	//copy per-process resource table
+	alias child_rsc R11;
+	alias prnt_rsc R10;
+	child_rsc=([child_prtb + 11]+1)*512-16;
+	prnt_rsc=([prnt_prtb + 11]+1)*512-16;
+	//copy 8 entries each of 2 word
+	alias rsc_idx R12;
+	rsc_idx=0;
+	while(rsc_idx < 16) do
+		if([prnt_rsc + rsc_idx]==SEMAPHORE) then
+			[SEMAPHORE_TABLE + 4*[prnt_rsc + (rsc_idx+1)]+1]=[SEMAPHORE_TABLE + 4*[prnt_rsc + (rsc_idx+1)] + 1] + 1;
+		endif;
+		if([prnt_rsc + rsc_idx]==FILE) then
+			[OPEN_FILE_TABLE + 4*[prnt_rsc + (rsc_idx+1)] + 1]=[OPEN_FILE_TABLE + 4*[prnt_rsc + (rsc_idx+1)] + 1] + 1;
+		endif;
+		[child_rsc + rsc_idx]=[prnt_rsc + rsc_idx];
+		[child_rsc + (rsc_idx+1)]=[prnt_rsc + (rsc_idx+1)];
+		rsc_idx= rsc_idx + 2;
+	endwhile;
+	//R15="rsc_cpy";
+	//print R15;
+	//breakpoint;
+	//[DISK_MAP_TABLE + childPID*10 + i]=[DISK_MAP_TABLE +ppid*10 + i];
+	//i=2to9//0->usr_pg
+	alias dsk_idx R12;
+	dsk_idx=0;
+	while(dsk_idx<10) do
+	[DISK_MAP_TABLE + childPID*10 + dsk_idx]=[DISK_MAP_TABLE + [SYSTEM_STATUS_TABLE + 1]*10 + dsk_idx];
+	//stack and usr_pg have -1 for prnt
+	dsk_idx=dsk_idx+1;
+	endwhile;	
+	
+	//page table init
+	//lib pages
+
+
+	alias pg_off R12;
+	pg_off=0;
+	alias prnt_pgt R11;
+	alias child_pgt R10;
+	alias mem_count R9;
+	while(pg_off<16) do
+	child_pgt=[child_prtb + 14];
+	prnt_pgt=PTBR;
+	[child_pgt + pg_off]=[ prnt_pgt + pg_off];
+	[child_pgt + (pg_off+1)]=[ prnt_pgt + (pg_off+1)];
+	if(pg_off >= 8 && [prnt_pgt + pg_off] == -1) then 
+	pg_off=pg_off+2;
+	continue;
+	endif;
+	mem_count=MEMORY_FREE_LIST + [ prnt_pgt + pg_off];
+	[mem_count]=[mem_count]+1;	
+	pg_off=pg_off+2;
+	endwhile;
+
+
+
+	//init stack pages
+	//done
+	//copy user stack pages
+	alias stk_off R12;
+	alias child_stk R11;
+	alias prnt_stk R10;
+
+	child_stk=[ [child_prtb + 14] + 16]*512;
+	prnt_stk=[ PTBR + 16]*512;
+	stk_off=0;
+	while(stk_off < 512) do
+	[child_stk + stk_off] = [prnt_stk + stk_off];
+	stk_off=stk_off+1;
+	endwhile;
+
+	child_stk = [ [child_prtb + 14] + 18]*512;
+        prnt_stk = [ PTBR + 18]*512;
+        stk_off=0;
+        while(stk_off<512) do
+        [child_stk + stk_off] = [prnt_stk + stk_off];
+        stk_off=stk_off+1;
+        endwhile;
+	
+	//BP on top of child ker-stk
+	[ [child_prtb + 11]*512 + [child_prtb + 12] ]= BP;
+	//init child BP by scheduler
+	
+	//ret values in usr stk
+	//[PROCESS_TABLE+ childPID*16 +13]->usrSP
+	alias child_usrSP R12;
+	//alias prnt_usrSP R11;
+	child_usrSP=[child_prtb +13];
+	child_usrSP=[ [child_prtb + 14] + 2*(child_usrSP/512)]*512 + (child_usrSP%512);
+	//prnt_usrSP=[ PTBR + 2*(pr_userSP/512)]*512 + (pr_userSP%512);
+	[child_usrSP-1]=0;
+	[pr_userSP-1]=childPID;
+
+	
+endif;
+
+	[PROCESS_TABLE+[SYSTEM_STATUS_TABLE+1]*16+ 9]=0;
+        SP=[PROCESS_TABLE+[SYSTEM_STATUS_TABLE+1]*16+13];
+        ireturn;

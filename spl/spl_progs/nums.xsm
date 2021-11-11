@@ -1,0 +1,12 @@
+MOV R0, 1 //512
+
+	MOV R1, R0 //514
+	MOV R2,20
+	LE R1, R2
+	JZ R1, 530
+	PORT P1, R0
+	OUT
+	INR R0
+	JMP 514
+
+	HALT 

@@ -1,0 +1,123 @@
+//R15="mod2";
+//print R15;
+//R15="f#";
+//print R15;
+//print R1;
+//R2 pg#,blk# basevald on f#
+//R1
+//R0
+alias f_num R1;
+alias pg_no R2;
+
+//Get Free Page
+if(f_num == 1) then 
+	//do not increment mem_wait_count in busy loop
+	[SYSTEM_STATUS_TABLE+ 3] = [SYSTEM_STATUS_TABLE +3] + 1;
+	while([SYSTEM_STATUS_TABLE+2] == 0) do
+		[PROCESS_TABLE +[SYSTEM_STATUS_TABLE +1]*16 + 4] = WAIT_MEM;
+		call MOD_5;
+	endwhile;
+	[SYSTEM_STATUS_TABLE+3] = [SYSTEM_STATUS_TABLE+3] -1;
+	[SYSTEM_STATUS_TABLE + 2] = [SYSTEM_STATUS_TABLE + 2] -1;
+	//max mem usage
+	if([82*512-1]<(128 - [SYSTEM_STATUS_TABLE+2])) then
+		[82*512-1]=128-[SYSTEM_STATUS_TABLE+2];
+	endif;
+	alias ind_off R14;
+	ind_off=1;
+	while([MEMORY_FREE_LIST+ind_off]!=0) do
+		ind_off = ind_off+1;
+	endwhile;
+	//there won't be a case of not bieng able to find a page
+	[MEMORY_FREE_LIST + ind_off] = 1;
+	R0=ind_off;
+	return;
+endif;
+//Release Page
+if(f_num ==2) then
+	
+	[MEMORY_FREE_LIST + pg_no] = [MEMORY_FREE_LIST + pg_no] - 1;
+	if([MEMORY_FREE_LIST + pg_no] == 0) then
+		[SYSTEM_STATUS_TABLE + 2] = [SYSTEM_STATUS_TABLE + 2] + 1;	
+	endif;
+	alias pid R15;
+	pid=1;
+	while(pid<16) do
+		if([PROCESS_TABLE + pid*16 + 4]==WAIT_MEM) then
+			[PROCESS_TABLE + pid*16 + 4]= READY;	
+		endif;
+	pid=pid+1;
+	endwhile;
+	return;
+endif;
+//Get Code Page
+alias block_no R2;
+if(f_num == 5) then
+		
+	alias PID R15;
+	alias fn_flg R14;
+	alias dsk_map_entry R13;
+	fn_flg=-1;
+	PID = 1;
+	dsk_map_entry=DISK_MAP_TABLE + PID*10;
+	while(PID < 16) do
+		alias dsk_map_off R12;
+		dsk_map_off=4;
+		while(dsk_map_off<8) do
+			if([dsk_map_entry + dsk_map_off]==block_no) then
+				fn_flg=dsk_map_off;
+				break;
+			endif;
+		dsk_map_off=dsk_map_off+1;
+		endwhile;
+		if(fn_flg!=-1) then
+			break;
+		endif;
+		PID=PID+1;
+		dsk_map_entry=DISK_MAP_TABLE + PID*10;
+	endwhile;
+	if(fn_flg!=-1 && ([ [PROCESS_TABLE + PID*16 + 14] + 2*fn_flg ]!=-1)) then
+		R0=[ [PROCESS_TABLE + PID*16 + 14] + 2*fn_flg ];
+                [MEMORY_FREE_LIST + R0] = [MEMORY_FREE_LIST + R0] + 1;
+                return;
+	else
+		multipush(R0,R1,R2,R3);
+                R1=1;
+                call MOD_2;
+                R4=R0;
+                multipop(R0,R1,R2,R3);
+                R0=R4;
+                multipush(R0,R1,R2,R3);
+                R1=2;
+                R4=block_no;
+                R2=[SYSTEM_STATUS_TABLE+1];
+                R3=R0;
+                call MOD_4;
+                multipop(R0,R1,R2,R3);
+                return;
+	endif;
+
+endif;
+//Release Block
+if(f_num == 4) then 
+	[DISK_FREE_LIST + block_no]=[DISK_FREE_LIST + block_no] - 1;
+	return;
+endif;
+//get free block 
+if(f_num==GET_FREE_BLOCK) then
+	//R15="gt_fr_blk";
+	//print R15;
+	alias dsk_free_list_off R14;
+	dsk_free_list_off=DISK_FREE_AREA;
+	while(dsk_free_list_off<DISK_SWAP_AREA) do
+		if([DISK_FREE_LIST + dsk_free_list_off]==0) then
+			[DISK_FREE_LIST + dsk_free_list_off]=1;
+			R0=dsk_free_list_off;
+			return;
+		endif;
+	dsk_free_list_off=dsk_free_list_off+1;
+	endwhile;
+	R0=-1;
+	return;
+	
+endif;

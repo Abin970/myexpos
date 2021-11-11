@@ -1,0 +1,31 @@
+
+//save SP to Uptr
+[PROCESS_TABLE + ( [SYSTEM_STATUS_TABLE + 1]* 16) + 13] = SP;
+//Setting SP to UArea Page number*512-1
+SP = [PROCESS_TABLE +([SYSTEM_STATUS_TABLE + 1] * 16) + 11] * 512 -1 ;
+// user context to kernel stack using the backup instruction
+backup;
+//R15="timer";
+//print R15;
+alias currPID R0;
+currPID = [SYSTEM_STATUS_TABLE + 1];
+
+alias PID R3;
+PID = 0;
+
+while(PID < 16) do
+	[PROCESS_TABLE + PID*16 ] = [PROCESS_TABLE + PID*16 ] + 1 ;
+	PID = PID + 1;
+endwhile;
+[PROCESS_TABLE + ( [SYSTEM_STATUS_TABLE + 1]* 16) + 4] = READY;
+
+
+call SCHEDULER;
+
+restore;
+SP = [PROCESS_TABLE + ([SYSTEM_STATUS_TABLE + 1]* 16) + 13];
+
+[PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1]* 16+ 9] = 0;
+
+ireturn;
+

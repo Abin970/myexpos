@@ -1,0 +1,53 @@
+R15="int10";
+print R15;
+//mode flag
+[PROCESS_TABLE + ( [SYSTEM_STATUS_TABLE + 1]* 16) + 9] = 10;
+//save SP to Uptr
+[PROCESS_TABLE + ( [SYSTEM_STATUS_TABLE + 1]* 16) + 13] = SP;
+//Setting SP to UArea Page number*512-1
+SP = [PROCESS_TABLE +([SYSTEM_STATUS_TABLE + 1] * 16) + 11] * 512 -1 ;
+
+alias currPID R0;
+currPID = [SYSTEM_STATUS_TABLE + 1];
+R15="exitPID";
+print R15;
+print R0;
+
+//exit system call #10
+multipush(R0,R1,R2);
+	R1=3;
+	R2=[SYSTEM_STATUS_TABLE+1];
+	call MOD_1;
+multipop(R0,R1,R2);
+//wake up process wating for this process to terminate
+
+//close files and semahpores
+
+//invalidate per-process resource table
+//        alias rsc_tb R13;
+//        rsc_tb=([PROCESS_TABLE + childPID*16 + 11]+1)*512-16;
+//        //invalidate 8 entries each of 2 word
+//        alias rsc_idx R14;
+//        while(rsc_idx <16) do
+//        [rsc_tb + rsc_idx]=-1;
+//        [rsc_tb + (rsc_idx+1)]=-1;
+//        rsc_idx+=2;
+//        endwhile;
+
+
+//set the current process to terminated state
+alias process_table_entry R1;
+process_table_entry = PROCESS_TABLE + currPID * 16;
+[process_table_entry + 4] = TERMINATED;
+
+alias PID R14;
+PID = 1;
+
+while(PID < 16) do
+        if([process_table_entry + 4] != TERMINATED) then
+	call SCHEDULER;
+	endif;
+	process_table_entry = PROCESS_TABLE + PID * 16;
+        PID = PID + 1;
+endwhile;
+

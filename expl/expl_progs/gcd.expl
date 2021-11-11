@@ -1,0 +1,42 @@
+decl
+int GCD(int a, int b);
+enddecl
+int GCD(int a, int b){
+decl
+int c;
+enddecl
+begin
+	if((a%b) == 0) then
+	
+		c = b;
+	
+	else
+
+		c = GCD(b, a%b);
+	
+	endif;
+	return c;
+end
+}
+
+int main(){
+
+decl
+	int temp,a,b,gcd;
+	str s1;
+enddecl
+begin
+	s1 = "a";
+	temp = exposcall("Write",-2,s1);
+	breakpoint;
+	temp = exposcall("Read",-1,a);
+	s1 = "b";
+	temp = exposcall("Write",-2,s1);
+	breakpoint;
+	temp = exposcall("Read",-1,b);
+	gcd = GCD(a,b);
+	breakpoint;
+	temp = exposcall("Write",-2,gcd);
+	return 0;
+end
+}

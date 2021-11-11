@@ -1,0 +1,204 @@
+//INT 4
+//SP+2	<----SP
+//ret
+//arg3
+//arg2(perm)(0-ex/1-open)
+//arg1(fname)
+//sys_call #
+alias userSP R0;
+userSP=SP;
+[PROCESS_TABLE + [SYSTEM_STATUS_TABLE+1]*16 +13]=SP;
+SP=[PROCESS_TABLE + [SYSTEM_STATUS_TABLE+1]*16 + 11]*512-1;
+alias sys_call_num R1;
+
+sys_call_num=[PTBR + 2*((userSP-5)/512)]*512 + (userSP-5)%512;
+sys_call_num=[sys_call_num];
+[PROCESS_TABLE + [SYSTEM_STATUS_TABLE+1]*16 +9]=sys_call_num;
+alias file_name R2;
+file_name=[PTBR + 2*((userSP-4)/512)]*512 + (userSP-4)%512;
+file_name=[file_name];
+alias permission R3;
+alias ret R4;
+ret=[PTBR + 2*((userSP-1)/512)]*512 + (userSP-1)%512;
+permission=[PTBR + 2*((userSP-3)/512)]*512 + (userSP-3)%512;
+permission=[permission];
+
+
+
+//Create system call
+if(sys_call_num==1) then 
+	alias inode_off R14;
+	//loop through the inode table find an entry
+	//which is either -1/file_name
+	inode_off=0;
+	alias file_flg R13;
+	file_flg=0;
+	while(inode_off<MAX_FILE_NUM) do
+		if([INODE_TABLE + inode_off*16 + 1]==file_name) then
+			[ret]=0;
+			[PROCESS_TABLE + [SYSTEM_STATUS_TABLE+1]*16 +9]=0;
+			SP=[PROCESS_TABLE + [SYSTEM_STATUS_TABLE+1]*16 +13];
+			ireturn;//this return statement can be reuduced using flag
+		endif;
+	inode_off=inode_off+1;
+	endwhile;
+
+	inode_off=0;
+        while(inode_off<MAX_FILE_NUM) do
+                if([INODE_TABLE + inode_off*16 + 1]==-1) then
+                	break;
+		endif;
+
+        inode_off=inode_off+1;
+        endwhile;
+	alias inode_entry R12;
+	inode_entry=INODE_TABLE + inode_off*16;
+	if(inode_off<MAX_FILE_NUM && [inode_entry + 1]==-1) then
+
+		[inode_entry + 0]=DATA;
+		[inode_entry + 1]=file_name;
+		[inode_entry  + 2]=0;
+		[inode_entry + 3]=[PROCESS_TABLE + [SYSTEM_STATUS_TABLE+1]*16+ +3];
+		[inode_entry  + 4]=permission;
+		[inode_entry  + 8]=-1;
+		[inode_entry + 9]=-1;
+		[inode_entry  + 10]=-1;
+		[inode_entry+ 11]=-1;
+		//index of root file entry and inode table table must match
+		[ROOT_FILE + 8*inode_off + 0]=file_name;
+		[ROOT_FILE + 8*inode_off + 1]=0;
+		[ROOT_FILE + 8*inode_off + 2]=DATA;
+		//[ROOT_FILE + 8*inode_off + 3];//username
+		[ROOT_FILE + 8*inode_off + 4]=permission;
+		
+		[ret]=0;
+		[PROCESS_TABLE + [SYSTEM_STATUS_TABLE+1]*16 +9]=0;
+                SP=[PROCESS_TABLE + [SYSTEM_STATUS_TABLE+1]*16 +13];
+                ireturn;
+	else
+		[ret]=-1;
+	endif;	
+		
+endif;
+
+
+
+//Delete system call
+if(sys_call_num==4) then
+	alias inode_off R5;
+        //loop through the inode table find an entry the file
+      
+        inode_off=0;
+        while(inode_off<MAX_FILE_NUM) do
+                if([INODE_TABLE + inode_off*16 + 1]==file_name) then	
+			break;
+		endif;
+        inode_off=inode_off+1;
+        endwhile;
+	//if(inode_off==MAX_FILE_NUM) then
+		//[ret]=0;
+                //[PROCESS_TABLE + [SYSTEM_STATUS_TABLE+1]*16 +9]=0;
+                //SP=[PROCESS_TABLE + [SYSTEM_STATUS_TABLE+1]*16 +13];
+                //ireturn;
+	//endif;
+	if(inode_off<MAX_FILE_NUM) then
+		alias inode_entry R6;
+		inode_entry=INODE_TABLE + inode_off*16;
+		if( (	([inode_entry + 4]==1)  
+			&& ([inode_entry + 3]!=[PROCESS_TABLE + [SYSTEM_STATUS_TABLE+1]*16 + 3])  )
+			&& ([inode_entry + 0]!=DATA)	) then
+			//not sure about the value at pt
+			[ret]=-1;
+                        [PROCESS_TABLE + [SYSTEM_STATUS_TABLE+1]*16 +9]=0;
+                        SP=[PROCESS_TABLE + [SYSTEM_STATUS_TABLE+1]*16 +13];
+                        ireturn;
+		endif; 
+		
+		//with the assumption that file with open count need
+		// not really lock inode(no modificationto inode)
+		if([FILE_STATUS_TABLE + 4*inode_off +1]==-1) then
+			//call release_inode();
+			//multipush(R0,R1,R2,R3,R4,R5);
+			//R1=5;
+			//R2=[SYSTEM_STATUS_TABLE+1];
+			//R3=inode_off;
+			//multipop(R0,R1,R2,,R3,R4,R5);
+			[ret]=-2;
+			//[PROCESS_TABLE + [SYSTEM_STATUS_TABLE+1]*16 +9]=0;
+                        //SP=[PROCESS_TABLE + [SYSTEM_STATUS_TABLE+1]*16 +13];
+                        //ireturn;
+		
+		else
+		//call acquire_inode()
+		multipush(R0,R1,R2,R3,R4,R5,R6);
+			R1=4;
+			R2=inode_off;
+			call MOD_0;
+		multipop(R0,R1,R2,R3,R4,R5,R6);
+
+		
+		alias inode_dsk R14;
+		alias buff_num R13;
+		inode_dsk=8;
+		while(inode_dsk<12) do
+			//if the file has a valid block   	
+			if([inode_entry + inode_dsk]!=-1) then
+				buff_num=[inode_entry + inode_dsk]%MAX_BUFFER;
+	
+				if([BUFFER_TABLE + 4*buff_num + 0]==[inode_entry  + inode_dsk]
+				&& [BUFFER_TABLE + 4*buff_num + 1]==1) then 
+						[BUFFER_TABLE + 4*buff_num + 1]=0;	
+				endif;
+				//call release block
+				multipush(R0,R1,R2,R3,R4,R5,R6);
+					R1=4;
+					R2=[SYSTEM_STATUS_TABLE+1];
+					R3=[inode_entry + inode_dsk];
+					call MOD_2;
+				multipop(R0,R1,R2,R3,R4,R5,R6);
+			endif;
+		inode_dsk=inode_dsk+1;
+		endwhile;
+	
+		
+		alias inode_entry_off R13;
+		inode_entry_off=0;
+		while(inode_entry_off<16) do
+			[inode_entry + inode_entry_off]=-1;
+		inode_entry_off=inode_entry_off+1;
+		endwhile;
+
+		
+		alias root_entry_off R12;
+		root_entry_off=0;
+		while(root_entry_off<8) do
+                        [ROOT_FILE+ inode_off*8 + root_entry_off]=-1;
+                root_entry_off=root_entry_off+1;
+                endwhile;
+	
+		//call release_inode()
+		multipush(R0,R1,R2,R3,R4,R5,R6);
+			R1=5;
+			R2=[SYSTEM_STATUS_TABLE+1];
+                        R3=inode_off;
+			call MOD_0;
+		multipop(R0,R1,R2,R3,R4,R5,R6);
+		[ret]=0;
+		
+		endif;	
+		
+			
+	else
+	//(inode_off==MAX_FILE_NUM)	
+	[ret]=0;
+	endif;
+		[PROCESS_TABLE + [SYSTEM_STATUS_TABLE+1]*16 +9]=0;
+                SP=[PROCESS_TABLE + [SYSTEM_STATUS_TABLE+1]*16 +13];
+                ireturn;
+
+endif;
+
+
+
+
+
